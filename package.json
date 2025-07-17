@@ -1,0 +1,17 @@
+{
+  "name": "sed-complemento",
+  "version": "1.0.0",
+  "description": "Complemento Google Sheets para SED Gestión Acompañamiento",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "prepush": "rsync -a src/ui/ dist/ui/ && cp appsscript.json dist/",
+    "push": "npm run build && npm run prepush && clasp push",
+    "deploy": "npm run push"
+  },
+  "devDependencies": {
+    "@google/clasp": "^2.4.2",
+    "@types/google-apps-script": "^1.0.83",
+    "typescript": "^5.4.5"
+  }
+}

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <style>
+    body { padding: 20px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    .input-field { margin: 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h4>Reportar Informe</h4>
+    <div class="row">
+        <div class="file-field input-field col s12">
+            <div class="btn">
+                <span><i class="material-icons left">attach_file</i>Subir Informe (Word)</span>
+                <input type="file" id="informeFile" accept=".doc, .docx, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+            </div>
+            <div class="file-path-wrapper">
+                <input class="file-path validate" type="text" placeholder="Seleccione un archivo de Word">
+            </div>
+        </div>
+    </div>
+    <div id="report-table-container"></div>
+    <div class="right-align" style="margin-top: 20px;">
+      <button id="btnGuardarInforme" class="btn waves-effect waves-light" onclick="guardarInforme()">Guardar Informe</button>
+    </div>
+    <div id="progress-container" class="progress" style="display: none; margin-top: 1rem;"><div class="indeterminate"></div></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script>
+    const data = <?!= JSON.stringify(initialData || { questions: [], ieos: [] }) ?>;
+
+    window.onload = function() {
+      const container = document.getElementById('report-table-container');
+      if (!data.ieos || data.ieos.length === 0) {
+        container.innerHTML = '<p class="red-text">No tiene IEOs asignadas para reportar.</p>';
+        return;
+      }
+
+      let tableHtml = '<table class="striped"><thead><tr><th>Pregunta</th>';
+      data.ieos.forEach(ieo => {
+        tableHtml += `<th>${escapeHtml(ieo.Institucion_educativa)}</th>`;
+      });
+      tableHtml += '</tr></thead><tbody>';
+
+      const options = ['No iniciada', 'Iniciada', 'Finalizada'];
+
+      data.questions.forEach(q => {
+        tableHtml += `<tr><td>${q.id}. ${escapeHtml(q.text)}</td>`;
+        data.ieos.forEach(ieo => {
+          tableHtml += `<td><div class="input-field"><select id="q${q.id}-ieo${ieo.ID_IEO}">`;
+          tableHtml += '<option value="" disabled selected>Seleccione...</option>';
+          options.forEach(opt => {
+            tableHtml += `<option value="${opt}">${opt}</option>`;
+          });
+          tableHtml += '</select></div></td>';
+        });
+        tableHtml += '</tr>';
+      });
+
+      tableHtml += '</tbody></table>';
+      container.innerHTML = tableHtml;
+      
+      // Initialize Materialize selects
+      M.FormSelect.init(document.querySelectorAll('select'));
+      // Initialize file input
+      M.AutoInit();
+    };
+
+    function guardarInforme() {
+      const informeFileInput = document.getElementById('informeFile');
+      if (informeFileInput.files.length === 0) {
+        M.toast({html: 'Por favor, seleccione un archivo de Word para subir.', classes: 'orange'});
+        return;
+      }
+
+      const file = informeFileInput.files[0];
+      const progressContainer = document.getElementById('progress-container');
+      const saveButton = document.getElementById('btnGuardarInforme');
+      
+      saveButton.disabled = true;
+      progressContainer.style.display = 'block';
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const fileData = {
+          name: file.name,
+          mimeType: file.type,
+          data: e.target.result.split(',')[1] // Base64 data
+        };
+        
+        console.log("Enviando archivo:", fileData.name);
+        google.script.run
+          .withSuccessHandler(onSaveSuccess)
+          .withFailureHandler(onSaveFailure)
+          .subirInformeBimensual(fileData);
+      };
+
+      reader.onerror = function(error) {
+        onSaveFailure({ message: 'Error al leer el archivo en el navegador.' });
+      };
+
+      reader.readAsDataURL(file);
+    }
+
+    function onSaveSuccess(response) {
+      const progressContainer = document.getElementById('progress-container');
+      const saveButton = document.getElementById('btnGuardarInforme');
+      
+      progressContainer.style.display = 'none';
+      saveButton.disabled = false;
+      
+      if (response.success) {
+        M.toast({html: 'Informe subido con éxito! URL: ' + response.fileUrl, classes: 'green', displayLength: 6000});
+      } else {
+        onSaveFailure({ message: response.message || 'Error desconocido del servidor.' });
+      }
+    }
+    
+    function onSaveFailure(error) {
+      const progressContainer = document.getElementById('progress-container');
+      const saveButton = document.getElementById('btnGuardarInforme');
+      
+      progressContainer.style.display = 'none';
+      saveButton.disabled = false;
+      M.toast({html: 'Error: ' + error.message, classes: 'red', displayLength: 6000});
+      console.error(error);
+    }
+
+    function escapeHtml(unsafe) {
+      return unsafe
+           .replace(/&/g, "&amp;")
+           .replace(/</g, "&lt;")
+           .replace(/>/g, "&gt;")
+           .replace(/"/g, "&quot;")
+           .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>

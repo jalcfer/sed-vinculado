@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    body {
+      font-family: Roboto, sans-serif;
+      background-color: #f8f9fa;
+    }
+
+    .container-fluid {
+      padding: 20px;
+      max-width: 900px;
+      margin: auto;
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+      margin-top: 25px;
+      margin-bottom: 15px;
+      border-bottom: 2px solid #00796b;
+      padding-bottom: 8px;
+      color: #00796b;
+    }
+
+    .btn,
+    .btn-small,
+    .btn-floating {
+      background-color: #00796b;
+    }
+
+    .btn:hover,
+    .btn-small:hover,
+    .btn-floating:hover {
+      background-color: #00897b;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    #loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.8);
+      z-index: 9999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+
+    #docenteInfo {
+      background-color: #e0f2f1;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+      color: #00796b;
+      font-size: 0.9em;
+    }
+
+    .dynamic-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .dynamic-row .input-field {
+      margin: 0 10px 0 0;
+      flex-grow: 1;
+    }
+
+    .grado-section {
+      margin-bottom: 15px;
+    }
+
+    .grado-section-title {
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+    }
+
+    .grado-checkbox-group {
+      padding-left: 20px;
+    }
+
+    [type="checkbox"].filled-in:checked+span:not(:empty)::after {
+      border-color: #00796b;
+      background-color: #00796b;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="loading-overlay">
+    <div class="preloader-wrapper big active" style="margin-bottom: 1rem;">
+      <div class="spinner-layer spinner-teal-only">
+        <div class="circle-clipper left">
+          <div class="circle"></div>
+        </div>
+        <div class="gap-patch">
+          <div class="circle"></div>
+        </div>
+        <div class="circle-clipper right">
+          <div class="circle"></div>
+        </div>
+      </div>
+    </div>
+    <span id="loading-text">Cargando...</span>
+  </div>
+
+  <div class="container-fluid">
+    <form id="docenteForm" onsubmit="event.preventDefault(); guardarDocente();">
+      <input type="hidden" id="docenteId" value="">
+
+      <h5 class="section-title">Datos Personales</h5>
+      <div class="row">
+        <div class="input-field col s12 m4"><select id="tipoIdentificacion" required>
+            <option value="" disabled selected>Seleccione...</option>
+          </select><label>Tipo ID*</label></div>
+        <div class="input-field col s12 m5"><input id="numeroIdentificacion" type="text" class="validate"
+            required><label for="numeroIdentificacion">Número ID*</label></div>
+        <div class="input-field col s12 m3"><button type="button" id="btnBuscarDocente"
+            class="btn waves-effect waves-light" style="margin-top: 15px;" onclick="buscarDocente()">Buscar</button>
+        </div>
+      </div>
+      <div id="docenteInfo" class="row hidden"></div>
+      <div class="row">
+        <div class="input-field col s12 m6"><input id="nombreDocente" type="text" class="validate" required><label
+            for="nombreDocente">Nombres*</label></div>
+        <div class="input-field col s12 m6"><input id="apellidoDocente" type="text" class="validate" required><label
+            for="apellidoDocente">Apellidos*</label></div>
+      </div>
+      <div class="row">
+        <div class="input-field col s12 m6"><input id="correoDocente" type="email" class="validate"><label
+            for="correoDocente">Correo Electrónico</label></div>
+        <div class="input-field col s12 m6"><input id="celularDocente" type="text"><label for="celularDocente">Número
+            Celular</label></div>
+      </div>
+
+      <h5 class="section-title">Títulos Académicos</h5>
+      <div id="titulosContainer">
+        <!-- Filas de títulos se agregarán aquí -->
+      </div>
+      <div class="row">
+        <div class="col s12"><button type="button" id="btnAgregarTitulo" class="btn-small waves-effect waves-light"><i
+              class="material-icons left">add</i>Agregar Título</button></div>
+      </div>
+
+      <h5 class="section-title">Asignación Pedagógica</h5>
+      <div class="row">
+        <div class="input-field col s12">
+          <select id="areaPrincipal" required>
+            <option value="" disabled selected>Seleccione...</option>
+          </select>
+          <label>Área de Docencia Principal*</label>
+        </div>
+      </div>
+      <h6>Áreas Auxiliares</h6>
+      <div id="areasAuxiliaresContainer">
+        <!-- Filas de áreas auxiliares se agregarán aquí -->
+      </div>
+      <div class="row">
+        <div class="col s12"><button type="button" id="btnAgregarArea" class="btn-small waves-effect waves-light"><i
+              class="material-icons left">add</i>Agregar Área Auxiliar</button></div>
+      </div>
+
+      <h5 class="section-title">Grados que Orienta</h5>
+      <div id="gradosContainer" class="row">
+        <!-- Secciones de grados se generarán aquí -->
+      </div>
+
+      <div class="row" style="margin-top: 30px;">
+        <div class="col s12 center-align">
+          <button type="button" class="btn-large waves-effect waves-light grey" onclick="resetForm()">Limpiar</button>
+          <button type="submit" class="btn-large waves-effect waves-light">Guardar Docente</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script>
+    let allAreas = []; // Almacenará todas las áreas de docencia para los dropdowns
+
+    /**
+     * Se ejecuta cuando la ventana se ha cargado.
+     * Inicializa los componentes de Materialize y carga los datos iniciales del formulario.
+     */
+    window.onload = function () {
+      M.AutoInit();
+      initializeForm();
+      document.getElementById('btnAgregarTitulo').addEventListener('click', () => agregarFila('titulosContainer', 'titulo'));
+      document.getElementById('btnAgregarArea').addEventListener('click', () => agregarFila('areasAuxiliaresContainer', 'area'));
+    };
+
+    /**
+     * Llama al servidor para obtener los datos necesarios para poblar los selects
+     * y las secciones dinámicas del formulario (Tipos de ID, Áreas, Grados).
+     */
+    function initializeForm() {
+      showLoading('Cargando datos iniciales...');
+      google.script.run
+        .withSuccessHandler(onInitialDataSuccess)
+        .withFailureHandler(onFailure)
+        .getInitialDataForDocenteForm();
+    }
+
+    /**
+     * Maneja la respuesta exitosa de la carga de datos iniciales.
+     * Puebla los selects y renderiza las secciones dinámicas.
+     * @param {object} data - Objeto con los datos del servidor.
+     */
+    function onInitialDataSuccess(data) {
+      console.log("Datos iniciales recibidos:", data);
+
+      // 1. Poblar Tipos de ID
+      const tipoIdSelect = document.getElementById('tipoIdentificacion');
+      populateSelect(tipoIdSelect, data.tiposId, 'ID_Tipo_identificacion', 'Tipo_identificacion');
+
+      // 2. Poblar Área Principal y almacenar globalmente
+      const areaPrincipalSelect = document.getElementById('areaPrincipal');
+      allAreas = data.areas; // Guardar para uso en áreas auxiliares
+      populateSelect(areaPrincipalSelect, allAreas, 'ID_Area_docencia', 'Nombre_area_docencia');
+
+      // 3. Renderizar Grados
+      renderGrados(data.grados);
+
+      // 4. Reinicializar los selects de Materialize
+      var selects = document.querySelectorAll('select');
+      M.FormSelect.init(selects);
+
+      hideLoading();
+    }
+
+    /**
+     * Función de utilidad para poblar un elemento <select>.
+     * @param {HTMLSelectElement} selectElement El elemento select a poblar.
+     * @param {any[]} items El array de objetos para las opciones.
+     * @param {string} valueKey La clave del objeto para el `value` de la opción.
+     * @param {string} textKey La clave del objeto para el texto de la opción.
+     */
+    function populateSelect(selectElement, items, valueKey, textKey) {
+      selectElement.innerHTML = '<option value="" disabled selected>Seleccione...</option>'; // Reset
+      items.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item[valueKey];
+        option.textContent = item[textKey];
+        selectElement.appendChild(option);
+      });
+    }
+
+    /**
+     * Renderiza las secciones de grados agrupados por tipo.
+     * @param {any[]} grados - Array de objetos de grado desde el servidor.
+     */
+    function renderGrados(grados) {
+      const container = document.getElementById('gradosContainer');
+      container.innerHTML = ''; // Limpiar
+
+      const gradosAgrupados = grados.reduce((acc, grado) => {
+        const tipo = grado.Tipo_grado_docencia;
+        if (!acc[tipo]) acc[tipo] = [];
+        acc[tipo].push(grado);
+        return acc;
+      }, {});
+
+      for (const tipoGrado in gradosAgrupados) {
+        const section = document.createElement('div');
+        section.className = 'col s12 m4 grado-section';
+        const titleId = `check-all-${tipoGrado.replace(/\s+/g, '-')}`;
+        let checkboxesHtml = `<div class="grado-section-title"><label><input type="checkbox" class="filled-in" id="${titleId}" /><span>${tipoGrado}</span></label></div><div class="grado-checkbox-group">`;
+        gradosAgrupados[tipoGrado].forEach(grado => {
+          checkboxesHtml += `<p><label><input type="checkbox" class="filled-in" name="grados" value="${grado.ID_Grado_docencia}" /><span>${grado.Numero_grado_docencia}</span></label></p>`;
+        });
+        checkboxesHtml += '</div>';
+        section.innerHTML = checkboxesHtml;
+        container.appendChild(section);
+
+        document.getElementById(titleId).addEventListener('change', function (e) {
+          const isChecked = e.target.checked;
+          const checkboxes = e.target.closest('.grado-section').querySelectorAll('input[name="grados"]');
+          checkboxes.forEach(cb => cb.checked = isChecked);
+        });
+      }
+    }
+
+    /**
+     * Busca un docente por su tipo y número de identificación.
+     * Llama a una función del servidor y maneja la respuesta.
+     */
+    function buscarDocente() {
+      const tipoId = document.getElementById('tipoIdentificacion').value;
+      const numeroId = document.getElementById('numeroIdentificacion').value.trim();
+      const docenteInfoDiv = document.getElementById('docenteInfo');
+
+      if (!tipoId || !numeroId) {
+        M.toast({ html: 'Por favor, seleccione un tipo y número de identificación.', classes: 'orange' });
+        return;
+      }
+
+      showLoading('Buscando docente...');
+      docenteInfoDiv.classList.add('hidden');
+      docenteInfoDiv.innerHTML = '';
+
+      google.script.run
+        .withSuccessHandler(onBuscarDocenteSuccess)
+        .withFailureHandler(onFailure)
+        .buscarDocentePorIdentificacion(tipoId, numeroId);
+    }
+
+    /**
+     * Maneja la respuesta del servidor al buscar un docente.
+     * @param {DocenteCompletoDTO | null} dto El DTO del docente o null si no se encontró.
+     */
+    function onBuscarDocenteSuccess(dto) {
+      hideLoading();
+      const docenteInfoDiv = document.getElementById('docenteInfo');
+
+      if (dto) {
+        console.log("Docente encontrado:", dto);
+        let infoMessage = `Docente encontrado. Cargando datos para edición.`;
+        if (dto.existeEnOtraIEO) {
+          infoMessage += ' <strong>Atención:</strong> Este docente también está registrado en otra IEO.';
+        }
+        docenteInfoDiv.innerHTML = infoMessage;
+        docenteInfoDiv.classList.remove('hidden');
+        poblarFormulario(dto);
+      } else {
+        console.log("Docente no encontrado.");
+        docenteInfoDiv.textContent = 'Docente no encontrado. Puede registrarlo como nuevo.';
+        docenteInfoDiv.classList.remove('hidden');
+        // Limpiar solo los campos que no son de identificación para permitir el registro
+        document.getElementById('docenteId').value = '';
+        document.getElementById('nombreDocente').value = '';
+        document.getElementById('apellidoDocente').value = '';
+        document.getElementById('correoDocente').value = '';
+        document.getElementById('celularDocente').value = '';
+        document.getElementById('titulosContainer').innerHTML = '';
+        document.getElementById('areasAuxiliaresContainer').innerHTML = '';
+        document.getElementById('areaPrincipal').value = '';
+        document.querySelectorAll('input[name="grados"]').
+          forEach(cb => cb.checked = false);
+        M.updateTextFields();
+        M.FormSelect.init(document.querySelectorAll('select'));
+      }
+    }
+
+    /**
+     * Puebla el formulario con los datos de un docente existente.
+     * @param {DocenteCompletoDTO} dto - El DTO del docente.
+     */
+    function poblarFormulario(dto) {
+      // Limpiar formulario antes de poblar para evitar estados inconsistentes
+      resetForm(false); // false para no recargar datos iniciales
+
+      document.getElementById('docenteId').value = dto.docenteId;
+      document.getElementById('nombreDocente').value = dto.nombreDocente;
+      document.getElementById('apellidoDocente').value = dto.apellidoDocente;
+      document.getElementById('correoDocente').value = dto.correoDocente || '';
+      document.getElementById('celularDocente').value = dto.celularDocente || '';
+
+      // Poblar Títulos
+      const titulosContainer = document.getElementById('titulosContainer');
+      titulosContainer.innerHTML = '';
+      if (dto.titulos && dto.titulos.length > 0) {
+        dto.titulos.forEach(titulo => {
+          agregarFila('titulosContainer', 'titulo', titulo);
+        });
+      }
+
+      // Poblar Área Principal
+      document.getElementById('areaPrincipal').value = dto.areaPrincipal;
+
+      // Poblar Áreas Auxiliares
+      const areasContainer = document.getElementById('areasAuxiliaresContainer');
+      areasContainer.innerHTML = '';
+      if (dto.areasAuxiliares && dto.areasAuxiliares.length > 0) {
+        dto.areasAuxiliares.forEach(areaId => {
+          agregarFila('areasAuxiliaresContainer', 'area', { id: areaId });
+        });
+      }
+
+      // Poblar Grados
+      document.querySelectorAll('input[name="grados"]').forEach(cb => {
+        // Asegurarse de que la comparación sea entre números
+        cb.checked = dto.grados.includes(parseInt(cb.value, 10));
+      });
+
+      // Actualizar componentes de Materialize
+      M.updateTextFields();
+      M.FormSelect.init(document.querySelectorAll('select'));
+    }
+
+    /**
+     * Guarda los datos del docente. Recopila la información del formulario,
+     * la valida y la envía al servidor.
+     */
+    function guardarDocente() {
+      const form = document.getElementById('docenteForm');
+      if (!form.checkValidity()) {
+        M.toast({ html: 'Por favor, complete todos los campos requeridos (*).', classes: 'orange' });
+        form.reportValidity();
+        return;
+      }
+
+      showLoading('Guardando docente...');
+      const saveButton = form.querySelector('button[type="submit"]');
+      saveButton.disabled = true;
+
+      const titulos = Array.from(document.querySelectorAll('#titulosContainer .dynamic-row')).map(row => ({
+        tipo_titulo_docente: row.querySelector('.tipo-titulo').value.trim(),
+        titulo_docente: row.querySelector('.titulo-docente').value.trim()
+      })).filter(t => t.tipo_titulo_docente && t.titulo_docente);
+
+      const areasAuxiliares = Array.from(document.querySelectorAll('#areasAuxiliaresContainer .area-auxiliar'))
+        .map(select => parseInt(select.value, 10))
+        .filter(id => !isNaN(id));
+
+      const grados = Array.from(document.querySelectorAll('input[name="grados"]:checked'))
+        .map(cb => parseInt(cb.value, 10));
+
+      const docenteIdValue = document.getElementById('docenteId').value;
+
+      const dto = {
+        docenteId: docenteIdValue ? parseInt(docenteIdValue, 10) : undefined,
+        tipoIdentificacion: parseInt(document.getElementById('tipoIdentificacion').value, 10),
+        numeroIdentificacion: document.getElementById('numeroIdentificacion').value.trim(),
+        nombreDocente: document.getElementById('nombreDocente').value.trim(),
+        apellidoDocente: document.getElementById('apellidoDocente').value.trim(),
+        correoDocente: document.getElementById('correoDocente').value.trim(),
+        celularDocente: document.getElementById('celularDocente').value.trim(),
+        areaPrincipal: parseInt(document.getElementById('areaPrincipal').value, 10),
+        titulos: titulos,
+        areasAuxiliares: areasAuxiliares,
+        grados: grados
+      };
+
+      google.script.run
+        .withSuccessHandler(onSaveSuccess)
+        .withFailureHandler(onFailure)
+        .guardarDocente(dto);
+    }
+
+    /**
+     * Limpia todos los campos del formulario a su estado inicial.
+     * @param {boolean} [reloadInitialData=true] - Si se deben recargar los datos iniciales.
+     */
+    function resetForm(reloadInitialData = true) {
+      document.getElementById('docenteForm').reset();
+      document.getElementById('docenteId').value = '';
+      document.getElementById('titulosContainer').innerHTML = '';
+      document.getElementById('areasAuxiliaresContainer').innerHTML = '';
+      document.getElementById('docenteInfo').classList.add('hidden');
+      document.getElementById('docenteInfo').textContent = '';
+      M.updateTextFields();
+
+      if (reloadInitialData) {
+        // Recargar los datos iniciales (grados, etc.)
+        document.getElementById('gradosContainer').innerHTML = '';
+        initializeForm();
+      } else {
+
+        document.querySelectorAll('input[name="grados"]').forEach(cb => cb.checked = false);
+        // Solo reinicializar los selects de materialize
+        M.FormSelect.init(document.querySelectorAll('select'));
+      }
+    }
+
+    /**
+     * Agrega una fila dinámica para Títulos o Áreas Auxiliares.
+     * @param {string} containerId - El ID del div contenedor.
+     * @param {string} type - El tipo de fila a agregar ('titulo' o 'area').
+     * @param {object} [data] - Datos opcionales para pre-poblar la fila.
+     */
+    function agregarFila(containerId, type, data = {}) {
+      const container = document.getElementById(containerId);
+      const row = document.createElement('div');
+      row.className = 'dynamic-row';
+
+      if (type === 'titulo') {
+        row.innerHTML = `
+          <div class="input-field">
+            <input type="text" class="validate tipo-titulo" value="${data.tipo_titulo_docente || ''}" placeholder="Ej: Pregrado, Especialización...">
+          </div>
+          <div class="input-field">
+            <input type="text" class="validate titulo-docente" value="${data.titulo_docente || ''}" placeholder="Ej: Licenciado en Matemáticas...">
+          </div>
+          <a class="btn-floating btn-small waves-effect waves-light red" onclick="this.parentElement.remove()"><i class="material-icons">remove</i></a>
+        `;
+      } else if (type === 'area') {
+        let optionsHtml = '<option value="" disabled>Seleccione...</option>';
+        allAreas.forEach(area => {
+          const selected = data.id && area.ID_Area_docencia == data.id ? 'selected' : '';
+          optionsHtml += `<option value="${area.ID_Area_docencia}" ${selected}>${area.Nombre_area_docencia}</option>`;
+        });
+
+        row.innerHTML = `
+          <div class="input-field" style="width: 100%;">
+            <select class="area-auxiliar">${optionsHtml}</select>
+          </div>
+          <a class="btn-floating btn-small waves-effect waves-light red" onclick="this.parentElement.remove()"><i class="material-icons">remove</i></a>
+        `;
+      }
+
+      container.appendChild(row);
+
+      if (type === 'area') {
+        M.FormSelect.init(row.querySelector('select'));
+      }
+    }
+
+    function onSaveSuccess(response) {
+      hideLoading();
+      const saveButton = document.querySelector('button[type="submit"]');
+      saveButton.disabled = false;
+
+      if (response.success) {
+        M.toast({ html: response.message, classes: 'green' });
+        // Actualizar el ID del docente en el formulario para futuras ediciones
+        document.getElementById('docenteId').value = response.docenteId;
+        // Actualizar el mensaje de información
+        const docenteInfoDiv = document.getElementById('docenteInfo');
+        docenteInfoDiv.innerHTML = 'El docente ha sido guardado. Puede continuar editando o <a href="#" onclick="resetForm(); return false;">limpiar para agregar uno nuevo</a>.';
+        docenteInfoDiv.classList.remove('hidden');
+      } else {
+        // Si el servidor devuelve un error de negocio, lo manejamos con el handler de fallo
+        onFailure({ message: response.message || "Ocurrió un error desconocido al guardar." });
+      }
+    }
+
+    function showLoading(message) {
+      document.getElementById('loading-text').textContent = message;
+      document.getElementById('loading-overlay').classList.remove('hidden');
+    }
+
+    function hideLoading() {
+      document.getElementById('loading-overlay').classList.add('hidden');
+    }
+
+    function onFailure(error) {
+      hideLoading();
+      const saveButton = document.querySelector('button[type="submit"]');
+      if (saveButton) saveButton.disabled = false;
+
+      M.toast({ html: 'Error: ' + error.message, classes: 'red' });
+      console.error(error);
+    }
+  </script>
+</body>
+
+</html>
