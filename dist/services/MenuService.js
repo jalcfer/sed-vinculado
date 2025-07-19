@@ -73,7 +73,9 @@ class MenuService {
      * @returns El rol del usuario: 'OWNER', 'ADMIN', o 'PA'.
      */
     getCurrentUserRole() {
-        const userEmail = Session.getActiveUser().getEmail();
+        // const userEmail = Session.getActiveUser().getEmail();
+        const userEmail = PropertiesService.getScriptProperties().getProperty(appConfig.properties.USER_EMAIL_KEY) || '';
+        ;
         const owner = SpreadsheetApp.getActiveSpreadsheet().getOwner();
         Logger.log(`Iniciando obtención de rol para el usuario: ${userEmail}`);
         // 1. El propietario del archivo siempre tiene el rol de OWNER.

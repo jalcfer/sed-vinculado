@@ -30,7 +30,7 @@ function iniciarJornada_() {
         }
         const createProcess = (reportProgress) => {
             // 2. Llamar al servicio para iniciar la jornada en la BD
-            const resultadoServicio = getJornadaService().iniciarJornada(reportProgress);
+            const resultadoServicio = getJornadaService().iniciarJornada(numParticipantes, reportProgress);
             // 3. Actualizar la hoja con los datos devueltos
             sheet.getRange(appConfig.sheets.jornada.fields.fechaJornada.range).setValue(resultadoServicio.fecha);
             sheet.getRange(appConfig.sheets.jornada.fields.numeroJornada.range).setValue(resultadoServicio.numeroJornada);
@@ -92,5 +92,61 @@ function finalizarJornada_() {
         const error = e;
         Logger.log(`Error en registrarJornada_: ${error.message}\n${error.stack}`);
         ui.alert('Error', `No se pudo registrar la jornada: ${error.message}`, ui.ButtonSet.OK);
+    }
+}
+function getLineasDeTrabajoSeleccionadas_Modal() {
+    try {
+        return getJornadaService().getLineasDeTrabajoFromSheet();
+    }
+    catch (e) {
+        Logger.log(`Error en getLineasDeTrabajoSeleccionadas_Modal: ${e.message}`);
+        throw e; // Re-lanzar para que el .withFailureHandler del cliente lo capture.
+    }
+}
+function getExistingLDAData_Modal() {
+    try {
+        return getJornadaService().getLDAFromProperties();
+    }
+    catch (e) {
+        Logger.log(`Error en getExistingLDAData_Modal: ${e.message}`);
+        throw e;
+    }
+}
+function guardarLogrosDificultadesAcuerdos(datosParaGuardar) {
+    try {
+        getJornadaService().saveLDAToProperties(datosParaGuardar);
+        return { success: true, message: "Datos guardados temporalmente." };
+    }
+    catch (e) {
+        Logger.log(`Error en guardarLogrosDificultadesAcuerdos: ${e.message}`);
+        return { success: false, message: e.message };
+    }
+}
+/**
+ * [CONTROLADOR] Muestra el diálogo modal para agregar/editar Logros, Dificultades y Acuerdos.
+ * Esta es la función que debe ser llamada desde el menú de la hoja de cálculo.
+ * El nombre debe coincidir con el que usas en la configuración del menú.
+ */
+function agregarLogrosPA() {
+    try {
+        // 1. Validar que una jornada esté activa.
+        // Si no hay ID de visita, no se puede continuar.
+        const idVisitaActiva = PropertiesService.getScriptProperties().getProperty(appConfig.properties.ID_JORNADA_KEY);
+        if (!idVisitaActiva) {
+            getNotificationService().showError("No hay una jornada activa. Por favor, inicie una jornada antes de registrar logros.");
+            return;
+        }
+        // 2. Crear el HTML desde el archivo.
+        const htmlOutput = HtmlService.createHtmlOutputFromFile('ui/modals/agregarLogros') // Usa el nombre de tu archivo HTML
+            .setWidth(900) // Ajusta el ancho según tus necesidades
+            .setHeight(650); // Ajusta la altura según tus necesidades
+        // 3. Mostrar el diálogo.
+        SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Registrar Logros, Dificultades y Acuerdos');
+    }
+    catch (e) {
+        const error = e;
+        Logger.log(`Error al intentar abrir el diálogo de logros: ${error.message}`);
+        // Usamos nuestro NotificationService para mostrar el error al usuario.
+        getNotificationService().showError(`No se pudo abrir el diálogo. Error: ${error.message}`);
     }
 }

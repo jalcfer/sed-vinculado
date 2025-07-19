@@ -81,11 +81,11 @@ class DocenteService_ {
    * @returns Un objeto con el resultado de la operación.
    */
   public saveOrUpdateDocente(dto: DocenteCompletoDTO, idIeoActual: number): { success: boolean; message: string; docenteId: number } {
-    //this.repository.beginTransaction();
     try {
       let docenteId = dto.docenteId;
 
       const docenteData: Partial<Docente> = {
+        // Mapeo directo desde el DTO a las columnas de la tabla 'Docente'
         Tipo_identificacion_docente: dto.tipoIdentificacion,
         Numero_identificacion_docente: dto.numeroIdentificacion,
         Nombre_docente: dto.nombreDocente,
@@ -97,56 +97,120 @@ class DocenteService_ {
       };
 
       if (docenteId) {
-        // --- Lógica de Actualización ---
         this.repository.updateDocente(docenteId, docenteData);
-
-        // Limpiar relaciones existentes para este docente antes de re-insertar
-        this.repository.deleteByDocenteId('Titulos_Docente', docenteId);
-        this.repository.syncTitulos(docenteId, dto.titulos);
-        this.repository.deleteByDocenteId('Docente_Area_Auxiliar', docenteId);
-        // Nota: Borramos todos los grados asociados al docente y los re-creamos para la IEO actual.
-        // Si se necesitara mantener grados de otras IEOs, la lógica aquí sería más compleja.
-        this.repository.deleteByDocenteId('Grado_Escolar_Docente', docenteId);
-
       } else {
-        // --- Lógica de Creación ---
         docenteId = this.repository.createDocente(docenteData);
       }
 
-      // --- (Re)Insertar relaciones ---
+      this.syncTitulos(docenteId, dto.titulos);
+      this.syncAreasAuxiliares(docenteId, dto.areasAuxiliares);
+      this.syncGrados(docenteId, idIeoActual, dto.grados);
 
-      // Insertar Títulos
-      const titulosToInsert = dto.titulos.map(t => ({ ...t, ID_Docente: docenteId }));
-      this.repository.batchInsert('Titulos_Docente', titulosToInsert);
-
-      // Insertar Áreas Auxiliares
-      const areasToInsert = dto.areasAuxiliares.map(areaId => ({
-        ID_Docente: docenteId,
-        ID_Area_docencia: areaId
-      }));
-      this.repository.batchInsert('Docente_Area_Auxiliar', areasToInsert);
-
-      // Insertar Grados
-      const gradosToInsert = dto.grados.map(gradoId => ({
-        ID_Docente: docenteId,
-        ID_IEO: idIeoActual,
-        ID_Grado_docencia: gradoId
-      }));
-      this.repository.batchInsert('Grado_Escolar_Docente', gradosToInsert);
-
-      // Asegurar la relación IEO_Docente
+      // Asegurar la relación IEO_Docente (esto ya estaba bien)
       if (!this.repository.findIeoDocente(docenteId, idIeoActual)) {
         this.repository.createIeoDocente(docenteId, idIeoActual);
       }
 
-      //this.repository.commitTransaction();
       return { success: true, message: 'Docente guardado exitosamente.', docenteId: docenteId };
 
     } catch (e) {
-      // this.repository.rollbackTransaction();
       const error = e as Error;
       Logger.log(`Error en saveOrUpdateDocente: ${error.message}\n${error.stack}`);
       throw new Error(`No se pudo guardar el docente. Detalles: ${error.message}`);
+    }
+  }
+
+  private syncTitulos(docenteId: number, nuevosTitulosDTO: TituloDTO[]): void {
+    // 1. Obtener los títulos actuales de la BD
+    const titulosActuales = this.repository.getTitulosByDocenteId(docenteId);
+
+    // Convertimos el array a un Map para búsquedas eficientes
+    const mapTitulosActuales = new Map(titulosActuales.map(t => [t.ID_Titulo_docente, t]));
+
+    const idsNuevosTitulos = new Set();
+
+    // 2. Iterar sobre los títulos que vienen del formulario
+    for (const dto of nuevosTitulosDTO) {
+      if (dto.id) {
+        // --- CASO: TÍTULO EXISTENTE (tiene ID) ---
+        idsNuevosTitulos.add(dto.id); // Marcar este ID como "todavía existe"
+
+        const tituloExistente = mapTitulosActuales.get(dto.id);
+
+        // Comprobar si ha habido algún cambio
+        if (tituloExistente && (tituloExistente.Tipo_titulo_docente !== dto.tipo_titulo_docente || tituloExistente.Titulo_docente !== dto.titulo_docente)) {
+          // Si cambió, lo actualizamos en la BD
+          Logger.log(`Actualizando título ID: ${dto.id}`);
+          this.repository.updateTitulo(dto.id, {
+            Tipo_titulo_docente: dto.tipo_titulo_docente,
+            Titulo_docente: dto.titulo_docente
+          });
+        }
+      } else {
+        // --- CASO: TÍTULO NUEVO (no tiene ID) ---
+        // Simplemente lo creamos
+        Logger.log(`Creando nuevo título para docente ID: ${docenteId}`);
+        this.repository.batchInsert('Titulos_Docente', [{
+          ID_Docente: docenteId,
+          Tipo_titulo_docente: dto.tipo_titulo_docente,
+          Titulo_docente: dto.titulo_docente
+        }]);
+      }
+    }
+
+    // 3. Identificar y eliminar los títulos que ya no existen
+    const idsParaEliminar: number[] = [];
+    for (const idActual of mapTitulosActuales.keys()) {
+      if (!idsNuevosTitulos.has(idActual)) {
+        // Si un ID de la BD no vino de vuelta del formulario, hay que eliminarlo.
+        idsParaEliminar.push(idActual);
+      }
+    }
+
+    if (idsParaEliminar.length > 0) {
+      Logger.log(`Eliminando ${idsParaEliminar.length} títulos obsoletos.`);
+      this.repository.batchDelete('Titulos_Docente', 'ID_Titulo_docente', idsParaEliminar);
+    }
+  }
+
+
+  private syncAreasAuxiliares(docenteId: number, nuevasAreasIds: number[]): void {
+    const areasActuales = this.repository.getAreasAuxiliaresByDocenteId(docenteId);
+    const idsActuales = areasActuales.map(a => a.ID_Area_docencia);
+
+    const setNuevas = new Set(nuevasAreasIds);
+    const setActuales = new Set(idsActuales);
+
+    const paraAgregar = nuevasAreasIds.filter(id => !setActuales.has(id));
+    const paraEliminar = areasActuales.filter(a => !setNuevas.has(a.ID_Area_docencia));
+
+    if (paraAgregar.length > 0) {
+      const records = paraAgregar.map(id => ({ ID_Docente: docenteId, ID_Area_docencia: id }));
+      this.repository.batchInsert('Docente_Area_Auxiliar', records);
+    }
+    if (paraEliminar.length > 0) {
+      const idsToDelete = paraEliminar.map(a => a.ID_Docente_area_auxiliar);
+      this.repository.batchDelete('Docente_Area_Auxiliar', 'ID_Docente_area_auxiliar', idsToDelete);
+    }
+  }
+
+  private syncGrados(docenteId: number, idIeoActual: number, nuevosGradosIds: number[]): void {
+    const gradosActuales = this.repository.getGradosByDocenteAndIeoId(docenteId, idIeoActual);
+    const idsActuales = gradosActuales.map(g => g.ID_Grado_docencia);
+
+    const setNuevos = new Set(nuevosGradosIds);
+    const setActuales = new Set(idsActuales);
+
+    const paraAgregar = nuevosGradosIds.filter(id => !setActuales.has(id));
+    const paraEliminar = gradosActuales.filter(g => !setNuevos.has(g.ID_Grado_docencia));
+
+    if (paraAgregar.length > 0) {
+      const records = paraAgregar.map(id => ({ ID_Docente: docenteId, ID_IEO: idIeoActual, ID_Grado_docencia: id }));
+      this.repository.batchInsert('Grado_Escolar_Docente', records);
+    }
+    if (paraEliminar.length > 0) {
+      const idsToDelete = paraEliminar.map(g => g.ID_Grado_escolar_docencia);
+      this.repository.batchDelete('Grado_Escolar_Docente', 'ID_Grado_escolar_docencia', idsToDelete);
     }
   }
 }

@@ -1,0 +1,49 @@
+// En: /src/services/SheetValidationService.ts
+
+class SheetValidationService {
+  private static instance: SheetValidationService;
+  private template: JornadaSheetTemplate;
+
+  // El servicio se inicializa con la plantilla que va a validar.
+  private constructor(template: JornadaSheetTemplate) {
+    this.template = template;
+  }
+
+  public static getInstance(): SheetValidationService {
+    if (!SheetValidationService.instance) {
+      // Cargamos la plantilla una sola vez.
+      const template = getJornadaSheetTemplate();
+      SheetValidationService.instance = new SheetValidationService(template);
+    }
+    return SheetValidationService.instance;
+  }
+
+  /**
+   * Verifica si una celda específica es editable según la plantilla.
+   * @param a1Notation La notación A1 de la celda.
+   * @returns `true` si es editable, `false` si no.
+   */
+  public isCellEditable(a1Notation: string): boolean {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    const cell = sheet.getRange(a1Notation);
+    const row = cell.getRow();
+    const col = cell.getColumn();
+    
+    for (const field of this.template.fields) {
+      const fieldRange = sheet.getRange(field.range);
+      
+      if (row >= fieldRange.getRow() && row <= fieldRange.getLastRow() &&
+          col >= fieldRange.getColumn() && col <= fieldRange.getLastColumn()) {
+        return field.editable;
+      }
+    }
+    return false;
+  }
+
+  // --- FUTURAS VALIDACIONES DE PLANTILLA PODRÍAN IR AQUÍ ---
+  // public isDataFormatValid(a1Notation: string, value: any): boolean { ... }
+}
+
+function getSheetValidationService(): SheetValidationService {
+  return SheetValidationService.getInstance();
+}

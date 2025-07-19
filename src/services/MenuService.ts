@@ -90,7 +90,8 @@ class MenuService {
    * @returns El rol del usuario: 'OWNER', 'ADMIN', o 'PA'.
    */
   private getCurrentUserRole(): 'ADMIN' | 'OWNER' | 'PA' | 'UNDEFINED' {
-    const userEmail = Session.getActiveUser().getEmail();
+    // const userEmail = Session.getActiveUser().getEmail();
+    const userEmail = PropertiesService.getScriptProperties().getProperty(appConfig.properties.USER_EMAIL_KEY) || '';;
     const owner = SpreadsheetApp.getActiveSpreadsheet().getOwner();
     Logger.log(`Iniciando obtención de rol para el usuario: ${userEmail}`);
 

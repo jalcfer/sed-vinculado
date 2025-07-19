@@ -3,26 +3,6 @@
  * Utiliza la clase SedDB para interactuar con la hoja de cálculo que actúa como BD.
  */
 
-// Workaround for linter. These types are defined in the central library and available globally at runtime.
-declare interface Visita {
-  ID_Visita: number;
-  ID_Acompanamiento: number;
-  ID_Semana_corte: number;
-  Tipo_Visita: string;
-  Fecha_visita: string;
-  Numero_jornada: number;
-  Estado: string;
-  Objetivo_visita: string;
-  DuracionHoras: number;
-}
-
-declare interface Linea_Trabajo_Visita {
-  ID_Linea_trabajo_visita: number;
-  ID_Linea_trabajo: number;
-  ID_Area_linea_trabajo: number;
-  ID_Visita: number;
-}
-
 /**
  * @class JornadaRepository
  * @description Encapsula la lógica de acceso a datos para las entidades de Jornada.
@@ -121,7 +101,7 @@ class JornadaRepository {
    * @param fileId El ID del archivo de Google Drive.
    * @returns El objeto Archivo_Jornada o null si no se encuentra.
    */
-  getJornadaInfoByFileId(fileId: string): (Archivo_Jornada & { nombreIEO: string }) | null {
+  getJornadaInfoByFileId(fileId: string): (Archivo_Jornada & IEO) | null {
     const result = this.db.selectFrom('Archivo_Jornada', [
       'ID_Archivo_jornada',
       'ID_Acompanamiento',
@@ -144,7 +124,7 @@ class JornadaRepository {
       Logger.log(`No se encontró Archivo_Jornada para el fileId: ${fileId}`);
       return null;
     }
-    return result[0] as (Archivo_Jornada & { nombreIEO: string });
+    return result[0] as (Archivo_Jornada & IEO);
   }
 
   /**
@@ -197,6 +177,7 @@ class JornadaRepository {
   createInitialVisita(data: {
     ID_Acompanamiento: string;
     ID_Semana_corte: number;
+    Numero_participantes: number;
     Numero_jornada: number;
     Fecha_visita: Date;
   }): number {
@@ -205,11 +186,12 @@ class JornadaRepository {
       ID_Semana_corte: data.ID_Semana_corte,
       Numero_jornada: data.Numero_jornada,
       Fecha_visita: data.Fecha_visita.toISOString(),
-      Estado: 'En Proceso', // Estado inicial
+      Estado: 'En Curso', // Estado inicial
       // Los siguientes campos se llenarán al finalizar la jornada
       Tipo_Visita: '',
       Objetivo_visita: '',
       DuracionHoras: 0,
+      Numero_participantes: data.Numero_participantes,
     };
     const newVisitaId = this.db.insertInto('Visita', visitaRecord);
     Logger.log(`Visita inicial creada con ID: ${newVisitaId}`);
@@ -365,23 +347,7 @@ class JornadaRepository {
     });
   }
 
-  /**
-   * Registra nuevos logros, dificultades y acuerdos para una visita.
-   * @param visitaId El ID de la visita.
-   * @param Un objeto con los arrays de logros, dificultades y acuerdos.
-   */
-  registrarLogrosDificultadesAcuerdos(visitaId: number, datos: LogrosDificultadesAcuerdosDTO): void {
-     // Registrar Logros
-    if (datos.logros && datos.logros.length > 0) {
-      this.registrarLogros(visitaId, datos.logros);
-    }
-    if (datos.dificultades && datos.dificultades.length > 0) {
-      this.registrarDificultades(visitaId, datos.dificultades);
-    }
-    if (datos.acuerdos && datos.acuerdos.length > 0) {
-      this.registrarAcuerdos(visitaId, datos.acuerdos);
-    }
-  }
+
   /**
    * Registra nuevas dificultades para una visita.
    * @param visitaId El ID de la visita.
@@ -428,10 +394,46 @@ class JornadaRepository {
       Url: archivo.url,
     });
   }
-}
 
-/**
+  /**
+   * Obtiene todos los registros de participantes asociados a un ID de visita específico.
+   * 
+   * @param idVisita El ID de la visita de la cual se quieren obtener los participantes.
+   * @returns Un array de objetos, donde cada objeto es un registro de la tabla 'Participante'.
+   *          Devuelve un array vacío si no se encuentran participantes.
+   */
+  public getParticipantesByVisitaId(idVisita: string | number): any[] {
+    // Validar que el idVisita no sea nulo o indefinido para evitar errores.
+    if (!idVisita) {
+      Logger.log("getParticipantesByVisitaId fue llamado con un idVisita nulo o inválido. Retornando array vacío.");
+      return [];
+    }
 
+    try {
+      // Usamos el QueryBuilder para hacer un SELECT en la tabla 'Participante'
+      // filtrando por el ID_Visita.
+      const participantes = this.db.selectFrom('Participante', [
+        'ID_Participante', // Seleccionamos las columnas que nos interesen
+        'ID_Docente',
+        'ID_Rol_institucional',
+        'Nombre_Completo',
+        // etc.
+      ])
+        .where('ID_Visita', '=', idVisita)
+        .execute();
+
+      return participantes;
+
+    } catch (e) {
+      const error = e as Error;
+      Logger.log(`Error al obtener participantes para la visita ID ${idVisita}: ${error.message}`);
+      // En caso de un error en la consulta, es más seguro devolver un array vacío
+      // para no romper la lógica que depende de este método.
+      return [];
+    }
+  }
+
+  
 }
 
 /**

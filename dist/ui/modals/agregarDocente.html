@@ -315,6 +315,7 @@
         .buscarDocentePorIdentificacion(tipoId, numeroId);
     }
 
+
     /**
      * Maneja la respuesta del servidor al buscar un docente.
      * @param {DocenteCompletoDTO | null} dto El DTO del docente o null si no se encontró.
@@ -322,6 +323,8 @@
     function onBuscarDocenteSuccess(dto) {
       hideLoading();
       const docenteInfoDiv = document.getElementById('docenteInfo');
+      const tipoIdSelect = document.getElementById('tipoIdentificacion');
+      const numeroIdInput = document.getElementById('numeroIdentificacion');
 
       if (dto) {
         console.log("Docente encontrado:", dto);
@@ -331,12 +334,22 @@
         }
         docenteInfoDiv.innerHTML = infoMessage;
         docenteInfoDiv.classList.remove('hidden');
+
+        // --- NUEVO: Bloquear campos de identificación ---
+        tipoIdSelect.disabled = true;
+        numeroIdInput.readOnly = true;
+
         poblarFormulario(dto);
       } else {
         console.log("Docente no encontrado.");
         docenteInfoDiv.textContent = 'Docente no encontrado. Puede registrarlo como nuevo.';
         docenteInfoDiv.classList.remove('hidden');
-        // Limpiar solo los campos que no son de identificación para permitir el registro
+
+        // --- NUEVO: Desbloquear campos por si estaban bloqueados ---
+        tipoIdSelect.disabled = false;
+        numeroIdInput.readOnly = false;
+
+        // Limpiar solo los campos de datos, no los de búsqueda
         document.getElementById('docenteId').value = '';
         document.getElementById('nombreDocente').value = '';
         document.getElementById('apellidoDocente').value = '';
@@ -345,20 +358,16 @@
         document.getElementById('titulosContainer').innerHTML = '';
         document.getElementById('areasAuxiliaresContainer').innerHTML = '';
         document.getElementById('areaPrincipal').value = '';
-        document.querySelectorAll('input[name="grados"]').
-          forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[name="grados"]').forEach(cb => cb.checked = false);
         M.updateTextFields();
         M.FormSelect.init(document.querySelectorAll('select'));
       }
     }
-
     /**
      * Puebla el formulario con los datos de un docente existente.
      * @param {DocenteCompletoDTO} dto - El DTO del docente.
      */
     function poblarFormulario(dto) {
-      // Limpiar formulario antes de poblar para evitar estados inconsistentes
-      resetForm(false); // false para no recargar datos iniciales
 
       document.getElementById('docenteId').value = dto.docenteId;
       document.getElementById('nombreDocente').value = dto.nombreDocente;
@@ -415,6 +424,7 @@
       saveButton.disabled = true;
 
       const titulos = Array.from(document.querySelectorAll('#titulosContainer .dynamic-row')).map(row => ({
+        id: row.dataset.tituloId ? parseInt(row.dataset.tituloId, 10) : undefined,
         tipo_titulo_docente: row.querySelector('.tipo-titulo').value.trim(),
         titulo_docente: row.querySelector('.titulo-docente').value.trim()
       })).filter(t => t.tipo_titulo_docente && t.titulo_docente);
@@ -455,6 +465,8 @@
     function resetForm(reloadInitialData = true) {
       document.getElementById('docenteForm').reset();
       document.getElementById('docenteId').value = '';
+      document.getElementById('tipoIdentificacion').disabled = false;
+      document.getElementById('numeroIdentificacion').readOnly = false;
       document.getElementById('titulosContainer').innerHTML = '';
       document.getElementById('areasAuxiliaresContainer').innerHTML = '';
       document.getElementById('docenteInfo').classList.add('hidden');
@@ -485,15 +497,29 @@
       row.className = 'dynamic-row';
 
       if (type === 'titulo') {
+        // Si el título viene con un ID_Titulo_docente (desde la BD), lo guardamos.
+        if (data.ID_Titulo_docente) {
+          row.dataset.tituloId = data.ID_Titulo_docente;
+        }
+        const pregradoSelected = data.tipo_titulo_docente === 'Pregrado' ? 'selected' : '';
+        const postgradoSelected = data.tipo_titulo_docente === 'Postgrado' ? 'selected' : '';
+
         row.innerHTML = `
-          <div class="input-field">
-            <input type="text" class="validate tipo-titulo" value="${data.tipo_titulo_docente || ''}" placeholder="Ej: Pregrado, Especialización...">
-          </div>
-          <div class="input-field">
-            <input type="text" class="validate titulo-docente" value="${data.titulo_docente || ''}" placeholder="Ej: Licenciado en Matemáticas...">
-          </div>
-          <a class="btn-floating btn-small waves-effect waves-light red" onclick="this.parentElement.remove()"><i class="material-icons">remove</i></a>
-        `;
+      <div class="input-field col s5">
+        <select class="tipo-titulo">
+          <option value="" disabled ${!data.tipo_titulo_docente ? 'selected' : ''}>Seleccione tipo...</option>
+          <option value="Pregrado" ${pregradoSelected}>Pregrado</option>
+          <option value="Postgrado" ${postgradoSelected}>Postgrado</option>
+        </select>
+        <label>Tipo de Título</label>
+      </div>
+      <div class="input-field col s6">
+        <input type="text" class="validate titulo-docente" value="${data.titulo_docente || ''}" placeholder="Ej: Licenciado en Matemáticas...">
+        <label>Título Obtenido</label>
+      </div>
+      <a class="btn-floating btn-small waves-effect waves-light red col s1" onclick="this.parentElement.remove()" style="margin-top: 20px;"><i class="material-icons">remove</i></a>
+    `;
+        // --- FIN DE CAMBIOS ---
       } else if (type === 'area') {
         let optionsHtml = '<option value="" disabled>Seleccione...</option>';
         allAreas.forEach(area => {
@@ -511,9 +537,14 @@
 
       container.appendChild(row);
 
-      if (type === 'area') {
-        M.FormSelect.init(row.querySelector('select'));
+      // ¡Crucial! Inicializar los nuevos selects de Materialize
+      const newSelects = row.querySelectorAll('select');
+      if (newSelects.length > 0) {
+        M.FormSelect.init(newSelects);
       }
+
+      // Actualizar las etiquetas de los inputs para que no se superpongan
+      M.updateTextFields();
     }
 
     function onSaveSuccess(response) {

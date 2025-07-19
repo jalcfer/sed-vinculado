@@ -7,6 +7,7 @@
  * DTO para un título académico de un docente.
  */
 interface TituloDTO {
+  id?: number;
   tipo_titulo_docente: string;
   titulo_docente: string;
 }
@@ -30,19 +31,24 @@ interface DocenteCompletoDTO {
 }
 
 /**
- * DTO para agrupar los logros, dificultades y acuerdos de una visita.
- */
-interface LogrosDificultadesAcuerdosDTO {
-  logros: string[];
-  dificultades: string[];
-  acuerdos: string[];
-}
-
-/**
  * DTO para la información de un archivo de evidencia.
  */
 interface EvidenciaDTO {
   nombre: string;
   blob: Blob;
   tipo: string;
+}
+
+
+
+/**
+ * DTO para agrupar los logros, dificultades y acuerdos por cada línea de trabajo.
+ * La clave principal es el nombre de la línea de trabajo.
+ */
+interface LogrosDificultadesAcuerdosDTO {
+  [lineaDeTrabajo: string]: {
+    logros: string[];
+    dificultades: string[];
+    acuerdos: string[];
+  };
 }

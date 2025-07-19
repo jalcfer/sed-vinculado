@@ -145,52 +145,66 @@ class DocenteRepository_ {
         this.db.delete(tableName, where);
     }
     /**
+     * Obtiene una vista de los docentes con sus datos básicos.
+     * @returns Un array de objetos con los datos básicos de los docentes.
+     */
+    getDocentesRawDataView() {
+        return this.db.selectFrom('Docente', ['ID_Docente', 'Nombre_docente', 'Apellido_docente']).execute();
+    }
+    /**
+     * Elimina registros de una tabla basados en un array de sus IDs primarios.
+     * @param tableName El nombre de la tabla.
+     * @param primaryKeyName El nombre de la columna de la clave primaria.
+     * @param idsToDelete Un array de IDs a eliminar.
+     */
+    batchDelete(tableName, primaryKeyName, idsToDelete) {
+        if (idsToDelete && idsToDelete.length > 0) {
+            Logger.log(`Eliminando ${idsToDelete.length} registros de ${String(tableName)}.`);
+            idsToDelete.forEach(id => {
+                this.db.delete(tableName, { [primaryKeyName]: id });
+            });
+        }
+    }
+    /**
      * Inserta múltiples registros en una tabla.
      * @param tableName El nombre de la tabla.
      * @param records Un array de objetos a insertar.
      */
     batchInsert(tableName, records) {
         if (records && records.length > 0) {
-            // Itera sobre cada registro y lo inserta individualmente
-            // usando el método existente y funcional de la librería.
+            Logger.log(`Insertando ${records.length} nuevos registros en ${String(tableName)}.`);
+            // Se podría optimizar para hacer una sola llamada a setValues,
+            // pero por ahora, la iteración es segura y funcional.
             records.forEach(record => {
                 this.db.insertInto(tableName, record);
             });
         }
     }
-    getDocentesRawDataView() {
-        return this.db.selectFrom('Docente', ['ID_Docente', 'Nombre_docente', 'Apellido_docente']).execute();
-    }
-    // En DocenteRepository.ts o en un servicio que lo use
-    /**
-     * Sincroniza los títulos de un docente, añadiendo los nuevos y eliminando los que ya no están.
-     * @param docenteId El ID del docente.
-     * @param nuevosTitulos El array de títulos que debe tener el docente, proveniente del formulario.
-     */
-    syncTitulos(docenteId, nuevosTitulos) {
-        // 1. Obtener los títulos actuales de la BD
-        const titulosActuales = this.db.selectFrom('Titulos_Docente', ['ID_Titulo', 'Tipo_titulo_docente', 'Titulo_docente'])
+    // Métodos para obtener relaciones específicas
+    getTitulosByDocenteId(docenteId) {
+        return this.db.selectFrom('Titulos_Docente', ['ID_Titulo_docente', 'Tipo_titulo_docente', 'Titulo_docente'])
             .where('ID_Docente', '=', docenteId)
             .execute();
-        // 2. Crear "sets" de claves únicas para facilitar la comparación
-        const claveUnica = (t) => `${t.tipo_titulo_docente}::${t.titulo_docente}`;
-        const setTitulosActuales = new Set(titulosActuales.map(claveUnica));
-        const setNuevosTitulos = new Set(nuevosTitulos.map(claveUnica));
-        // 3. Identificar y ELIMINAR los títulos que ya no existen
-        const titulosAEliminar = titulosActuales.filter((t) => !setNuevosTitulos.has(claveUnica(t)));
-        if (titulosAEliminar.length > 0) {
-            Logger.log(`Eliminando ${titulosAEliminar.length} títulos obsoletos para el docente ${docenteId}.`);
-            titulosAEliminar.forEach((t) => {
-                this.db.delete('Titulos_Docente', { ID_Titulo: t.ID_Titulo });
-            });
-        }
-        // 4. Identificar y AÑADIR los títulos nuevos
-        const titulosAAgregar = nuevosTitulos.filter(t => !setTitulosActuales.has(claveUnica(t)));
-        if (titulosAAgregar.length > 0) {
-            Logger.log(`Agregando ${titulosAAgregar.length} nuevos títulos para el docente ${docenteId}.`);
-            const recordsParaInsertar = titulosAAgregar.map(t => (Object.assign({ ID_Docente: docenteId }, t)));
-            this.batchInsert('Titulos_Docente', recordsParaInsertar);
-        }
+    }
+    getAreasAuxiliaresByDocenteId(docenteId) {
+        return this.db.selectFrom('Docente_Area_Auxiliar', ['ID_Docente_area_auxiliar', 'ID_Area_docencia'])
+            .where('ID_Docente', '=', docenteId)
+            .execute();
+    }
+    // IMPORTANTE: Obtenemos los grados solo para la IEO actual para evitar borrar datos de otras IEOs.
+    getGradosByDocenteAndIeoId(docenteId, ieoId) {
+        return this.db.selectFrom('Grado_Escolar_Docente', ['ID_Grado_escolar_docencia', 'ID_Grado_docencia'])
+            .where('ID_Docente', '=', docenteId)
+            .where('ID_IEO', '=', ieoId)
+            .execute();
+    }
+    /**
+     * Actualiza un título específico de un docente.
+     * @param tituloId El ID del título a actualizar.
+     * @param data Objeto con los datos a actualizar.
+     */
+    updateTitulo(tituloId, data) {
+        this.db.update('Titulos_Docente', data, { ID_Titulo_docente: tituloId });
     }
 }
 function getDocenteRepository() {

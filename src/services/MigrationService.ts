@@ -14,42 +14,6 @@ interface Evidencia {
 }
 
 
-interface Visita {
-  ID_Visita: number;
-  ID_Acompanamiento: number;
-  ID_Semana_corte: number;
-  Tipo_Visita: string;
-  Fecha_visita: string;
-  Numero_jornada: number;
-  Estado: string;
-  Objetivo_visita: string;
-  DuracionHoras: number;
-}
-
-interface Acompanamiento {
-  ID_Acompanamiento: number;
-  ID_Profesional_acompanamiento: number;
-  ID_IEO: number;
-  Nombre_carpeta: string;
-}
-
-interface ProfesionalAcompanamiento {
-  ID_Profesional_Acompanamiento: number;
-  ID_Folder_principal: string;
-  Nombre_profesional_acompanamiento: string;
-}
-
-interface IEO {
-  ID_IEO: number;
-  Institucion_educativa: string;
-}
-
-interface ArchivoJornada {
-  ID_Visita: number;
-  ID_archivo_drive: string;
-}
-
-
 class MigrationService_ {
   private static instance: MigrationService_;
   private driveUtils: any;
@@ -103,7 +67,7 @@ class MigrationService_ {
 
     // Crear mapas para búsqueda eficiente en DESTINO
     const acompanamientosDestinoMap: Map<number, Acompanamiento> = new Map(acompanamientosDestino.map((a: any) => [a.ID_Acompanamiento, a]));
-    const pasDestinoMap: Map<number, ProfesionalAcompanamiento> = new Map(pasDestino.map((p: any) => [p.ID_Profesional_Acompanamiento, p]));
+    const pasDestinoMap: Map<number, Profesional_Acompanamiento> = new Map(pasDestino.map((p: any) => [p.ID_Profesional_Acompanamiento, p]));
 
     let successCount = 0;
     let errorCount = 0;

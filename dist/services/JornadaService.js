@@ -173,7 +173,7 @@ class JornadaService {
      * Inicia una nueva jornada en la base de datos.
      * @returns Un objeto con los datos para actualizar la hoja: { fecha, numeroJornada, nombreIEO }.
      */
-    iniciarJornada(reportProgress) {
+    iniciarJornada(numParticipantes, reportProgress) {
         const fileId = SpreadsheetApp.getActiveSpreadsheet().getId();
         // 1. Obtener datos clave del repositorio
         const info = getJornadaRepository().getJornadaInfoByFileId(fileId);
@@ -201,14 +201,16 @@ class JornadaService {
         const nuevaVisitaId = getJornadaRepository().createInitialVisita({
             ID_Acompanamiento: info.ID_Acompanamiento,
             ID_Semana_corte: semanaCorteId,
+            Numero_participantes: numParticipantes,
             Numero_jornada: info.Numero_jornada,
             Fecha_visita: fechaActual,
         });
         reportProgress(`Visita inicial creada con ID: ${nuevaVisitaId}`);
         // 6. Actualizar Archivo_Jornada con el nuevo ID_Visita
         getJornadaRepository().linkVisitaToJornadaFile(info.ID_Archivo_jornada, nuevaVisitaId);
+        const ieoIdAsString = Math.floor(info.ID_IEO).toString();
         PropertiesService.getScriptProperties().setProperty(appConfig.properties.JORNADA_STATUS_KEY, 'INICIADA');
-        PropertiesService.getScriptProperties().setProperty(appConfig.properties.ID_IEO_KEY, String(parseInt(info.ID_IEO, 10)));
+        PropertiesService.getScriptProperties().setProperty(appConfig.properties.ID_IEO_KEY, ieoIdAsString);
         PropertiesService.getScriptProperties().setProperty(appConfig.properties.NOMBRE_IEO_KEY, info.Institucion_educativa);
         PropertiesService.getScriptProperties().setProperty(appConfig.properties.ID_JORNADA_KEY, String(nuevaVisitaId));
         reportProgress(`Archivo de jornada ${info.ID_Archivo_jornada} actualizado con el ID de visita ${nuevaVisitaId}.`);
@@ -256,18 +258,6 @@ class JornadaService {
         }
     }
     /**
-     * Guarda los logros, dificultades y acuerdos de una visita en PropertiesService.
-     * @param visitaId El ID de la visita.
-     * @param datos Un objeto con los arrays de logros, dificultades y acuerdos.
-     */
-    registrarLogrosDificultadesAcuerdos(visitaId, datos) {
-        const jornadaRepository = getJornadaRepository();
-        jornadaRepository.registrarLogrosDificultadesAcuerdos(visitaId, datos);
-        // Lógica para registrar logros, dificultades y acuerdos
-        // Por ejemplo, iterar sobre cada array y llamar a métodos en JornadaRepository.
-        Logger.log(`Registrando logros, dificultades y acuerdos para la visita ${visitaId}: ${JSON.stringify(datos)}`);
-    }
-    /**
      * Sube archivos de evidencia a Google Drive
      * @param visitaId El ID de la visita asociada.
      * @param archivos Un objeto con los archivos a subir
@@ -296,6 +286,105 @@ class JornadaService {
             };
             jornadaRepository.registrarEvidencia(visitaId, fileInfo);
         }
+    }
+    /**
+     * Método privado que orquesta las validaciones de negocio.
+     */
+    validateDataForFinalizacion() {
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+        const template = getJornadaSheetTemplate(); // Necesitamos la plantilla
+        // --- Validación 1: Campos requeridos de la plantilla ---
+        const requiredFieldsResult = getBusinessValidationService().validateRequiredFields(sheet, template);
+        if (!requiredFieldsResult.isValid) {
+            return requiredFieldsResult; // Devolver el primer error encontrado
+        }
+        // --- Validación 2: Conteo de participantes ---
+        // --- REFACTORIZACIÓN DE LA VALIDACIÓN 2 ---
+        // a) Obtener el número esperado desde PropertiesService.
+        const expectedCountStr = PropertiesService.getScriptProperties().getProperty(appConfig.properties.PARTICIPANTS_COUNT_KEY);
+        const expectedCount = expectedCountStr ? parseInt(expectedCountStr, 10) : 0;
+        // b) Obtener el número real de participantes contados EN LA HOJA.
+        //    Esto asume que tienes una fórmula =CONTARA(...) en la celda K19, por ejemplo.
+        const rangeTotalParticipantes = `${appConfig.sheets.jornada.fields.tituloParticipantes.fields.totalParticipantes.startCol}19`;
+        const totalCell = sheet.getRange(rangeTotalParticipantes);
+        const actualCountFromCell = totalCell.getValue();
+        // d) Realizar la validación con el servicio.
+        const participantCountResult = getBusinessValidationService().validateParticipantCount(expectedCount, actualCountFromCell);
+        if (!participantCountResult.isValid) {
+            return participantCountResult;
+        }
+        // --- Se pueden añadir más llamadas a otros métodos de validación aquí ---
+        // Si todas las validaciones pasan
+        return { isValid: true, message: 'Validación exitosa.' };
+    }
+    /**
+     * Obtiene las líneas de trabajo seleccionadas en la hoja de jornada.
+     * @returns Un array con los nombres de las líneas de trabajo.
+     */
+    getLineasDeTrabajoFromSheet() {
+        // Asumo que la celda I11 contiene los valores separados por coma, o es una validación de datos.
+        // Ajusta el rango según tu plantilla.
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+        const range = sheet.getRange(appConfig.sheets.jornada.fields.lineaTrabajoJornada.range); // ej. 'I11'
+        const value = range.getValue();
+        if (typeof value === 'string' && value.trim() !== '') {
+            // Devuelve un array de strings, quitando espacios extra.
+            return value.split(',').map(item => item.trim());
+        }
+        return [];
+    }
+    /**
+     * Guarda el objeto DTO de Logros, Dificultades y Acuerdos (LDA) en PropertiesService.
+     * @param ldaData El objeto DTO que viene del modal.
+     */
+    saveLDAToProperties(ldaData) {
+        try {
+            // Convertimos el objeto a un string JSON para poder guardarlo.
+            const ldaJsonString = JSON.stringify(ldaData);
+            PropertiesService.getScriptProperties().setProperty(appConfig.properties.LOGROS_DIFICULTADES_ACUERDOS_KEY, ldaJsonString);
+        }
+        catch (e) {
+            Logger.log(`Error al serializar o guardar LDA en PropertiesService: ${e.message}`);
+            throw new Error("No se pudo guardar la información de logros y dificultades.");
+        }
+    }
+    /**
+     * Obtiene los datos LDA desde PropertiesService y los devuelve como un objeto.
+     * @returns El objeto DTO de LDA, o null si no hay nada guardado.
+     */
+    getLDAFromProperties() {
+        const ldaJsonString = PropertiesService.getScriptProperties().getProperty(appConfig.properties.LOGROS_DIFICULTADES_ACUERDOS_KEY);
+        if (ldaJsonString) {
+            try {
+                // Parseamos el string JSON de vuelta a un objeto.
+                return JSON.parse(ldaJsonString);
+            }
+            catch (e) {
+                Logger.log(`Error al parsear LDA JSON desde PropertiesService: ${e.message}. Contenido: ${ldaJsonString}`);
+                // Si el JSON está corrupto, es más seguro devolver null.
+                return null;
+            }
+        }
+        return null;
+    }
+    // --- Este es el método que usaremos al final del proceso ---
+    /**
+     * Lee el JSON de LDA desde PropertiesService y lo guarda en la BD.
+     * @param idVisita El ID de la visita a la que se asociarán estos registros.
+     */
+    persistLDAFromPropertiesToDB(idVisita) {
+        const ldaData = this.getLDAFromProperties();
+        if (!ldaData) {
+            Logger.log("No se encontraron datos LDA en Properties para persistir en la BD.");
+            return;
+        }
+        // El repositorio debería tener métodos para insertar estos datos.
+        // getJornadaRepository().batchInsertLogros(idVisita, ldaData);
+        // getJornadaRepository().batchInsertDificultades(idVisita, ldaData);
+        // getJornadaRepository().batchInsertAcuerdos(idVisita, ldaData);
+        Logger.log(`LDA para la visita ${idVisita} persistidos correctamente en la BD.`);
+        // Opcional: ¿limpiar la propiedad después de guardar?
+        // PropertiesService.getScriptProperties().deleteProperty(appConfig.properties.LOGROS_DIFICULTADES_ACUERDOS_KEY);
     }
 }
 function getJornadaService() {

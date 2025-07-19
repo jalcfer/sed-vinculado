@@ -11,6 +11,9 @@
     ],
     "lib": ["es2017"]
   },
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts",      // Lee todos los archivos de tu código fuente, incluyendo src/models/dto.ts
+    "types/**/*.d.ts"   // Lee todas las declaraciones, incluyendo sed-central-lib.d.ts y global.d.ts
+  ],
   "exclude": ["node_modules"]
 }

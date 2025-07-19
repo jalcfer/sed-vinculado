@@ -69,3 +69,44 @@ function listAllTriggers() {
   
   return triggers;
 }
+
+
+/**
+ * Se ejecuta automáticamente cada vez que un usuario edita una celda.
+ * Versión robusta que revierte correctamente los cambios en celdas no editables.
+ * @param {GoogleAppsScript.Events.SheetsOnEdit} e El objeto de evento de edición.
+ */
+function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit): void {
+  // El objeto 'e' del evento contiene todo lo que necesitamos.
+  const range = e.range;
+  const sheet = range.getSheet();
+  
+  // Salir si la edición no es en la hoja que nos interesa.
+  if (sheet.getName() !== 'Jornada') { // O el nombre que uses
+    return;
+  }
+
+  // --- LÓGICA DE VALIDACIÓN MEJORADA ---
+
+  // Obtener la plantilla y los servicios necesarios.
+  const template = getJornadaSheetTemplate();
+  const validationService = getSheetValidationService();
+  
+  if (!validationService.isCellEditable(range.getA1Notation())) {
+    // La celda NO es editable.
+    const notificationService = getNotificationService();
+    
+    // Mostramos el mensaje de inmediato para que el usuario sepa qué pasó.
+    notificationService.showToast('Esta celda no se puede modificar.', 'Acción no permitida', 3);
+
+    // --- LÓGICA DE REVERSIÓN ROBUSTA ---
+    // Si e.oldValue existe (la celda tenía contenido), lo restauramos.
+    if (e.oldValue !== undefined) {
+      range.setValue(e.oldValue);
+    } else {
+      // Si e.oldValue es undefined, significa que la celda estaba vacía antes.
+      // En este caso, la acción correcta es borrar el nuevo contenido que el usuario introdujo.
+      range.clearContent();
+    }
+  }
+}
