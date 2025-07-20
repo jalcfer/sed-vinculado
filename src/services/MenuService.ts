@@ -34,16 +34,19 @@ class MenuService {
    */
   public refreshApplicationState(): void {
     const props = PropertiesService.getScriptProperties();
-    
-    const status = props.getProperty(appConfig.properties.JORNADA_STATUS_KEY) || 'No Iniciada';
-    const numero = props.getProperty(appConfig.properties.JORNADA_NUMERO_KEY) || 'N/A'; // Asegúrate de que JORNADA_NUMERO_KEY exista en appConfig
+    const fileId = SpreadsheetApp.getActiveSpreadsheet().getId();
+    const fileType = getJornadaRepository().getFileTypeById(fileId);
+
+    const status: EstadoJornada = (props.getProperty(appConfig.properties.JORNADA_STATUS_KEY) || 'No Iniciada') as EstadoJornada;
+    const numero = props.getProperty(appConfig.properties.JORNADA_NUMERO_KEY) || 'N/A';
     const isDirty = props.getProperty(appConfig.properties.JORNADA_IS_DIRTY_KEY) === 'true';
-    
+
     this.appState = {
+      fileType: fileType,
       jornadaStatus: status,
-      numeroJornada: numero, // Usamos la clave que definimos en menuConfig
+      numeroJornada: numero,
       isDirty: String(isDirty),
-      dirtyMark: isDirty ? ' ❌ ' : '' // Pre-calculamos la marca sucia
+      dirtyMark: isDirty ? ' ❌ ' : ''
     };
     Logger.log(`Estado de la aplicación refrescado: ${JSON.stringify(this.appState)}`);
   }
@@ -82,6 +85,10 @@ class MenuService {
       if (!item.roles.includes(userRole as any)) {
         return;
       }
+      // 2. Si el ítem especifica tipos de archivo, filtramos por el estado actual.
+      if (appState && item.fileTypes && !item.fileTypes.includes(appState.fileType as any)) {
+        return; // Si el tipo de archivo actual no está en la lista permitida, saltar.
+      }
 
       let finalLabel = item.icon ? `${item.icon} ${item.label}` : item.label;
       if (item.labelStates && appState) {
@@ -103,18 +110,18 @@ class MenuService {
       }
 
       if (item.subItems) {
-      // 3. ANTES de crear el submenú, verificar si tendrá contenido.
-      const visibleSubItems = item.subItems.filter(subItem => 
-        subItem.roles.includes(userRole as any)
-      );
+        // 3. ANTES de crear el submenú, verificar si tendrá contenido.
+        const visibleSubItems = item.subItems.filter(subItem =>
+          subItem.roles.includes(userRole as any)
+        );
 
-      // 4. SOLO si hay sub-ítems visibles para este rol, crear y poblar el submenú.
-      if (visibleSubItems.length > 0) {
-        const subMenu = this.ui.createMenu(finalLabel);
-        // Llamar a la recursión solo con los ítems visibles.
-        this.buildMenu(subMenu, visibleSubItems, userRole, appState);
-        parentMenu.addSubMenu(subMenu);
-      }
+        // 4. SOLO si hay sub-ítems visibles para este rol, crear y poblar el submenú.
+        if (visibleSubItems.length > 0) {
+          const subMenu = this.ui.createMenu(finalLabel);
+          // Llamar a la recursión solo con los ítems visibles.
+          this.buildMenu(subMenu, visibleSubItems, userRole, appState);
+          parentMenu.addSubMenu(subMenu);
+        }
       } else if (item.isSeparator) {
         parentMenu.addSeparator();
       } else if (item.functionName) {
@@ -167,12 +174,12 @@ class MenuService {
         .execute();
 
       if (paResult.length > 0) {
-          Logger.log(`El usuario ${userEmail} existe en la tabla profesional_acompañamiento. Asignando rol PA.`);
-          return 'PA';
+        Logger.log(`El usuario ${userEmail} existe en la tabla profesional_acompañamiento. Asignando rol PA.`);
+        return 'PA';
       } else {
-          Logger.log(`El usuario ${userEmail} no existe en la tabla Profesional_Acompanamiento.`);
+        Logger.log(`El usuario ${userEmail} no existe en la tabla Profesional_Acompanamiento.`);
 
-          return 'UNDEFINED';
+        return 'UNDEFINED';
       }
     } catch (e: any) {
       const error = e;

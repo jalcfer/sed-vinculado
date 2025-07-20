@@ -3,7 +3,7 @@ declare const SEDCentralLib: {
     asignarPAIEO(paId: string, ieoId: string, carpetaPA: string): void;
     isJornadaFileExists(acompId: string, numeroJornada: number): boolean;
     registerJornadaFile(acompId: string, nuevoArchivoId: string, carpetaEvidenciasId: string, numeroJornada: number): Archivo_Jornada;
-    getDriveUtils():any;
+    getDriveUtils(): any;
 };
 
 
@@ -49,6 +49,51 @@ declare const schema: {
         Archivo_PA: string;
         Archivo_Informe_PA: string;
     };
+
+
+
+    /**
+     * DUPLICACIÓN MANUAL del objeto primaryKeyMap.
+     * Las claves y valores aquí DEBEN ser idénticos a los del schema.ts de la librería.
+     * Esto permite que el código que depende de él (como el CatalogoRepository) funcione
+     * tanto en tiempo de compilación como de ejecución.
+     */
+    primaryKeyMap: {
+        IEO: 'ID_IEO';
+        Docente: 'ID_Docente';
+        IEO_Sede: 'ID_Sede';
+        Titulos_Docente: 'ID_Titulo_docente';
+        Docente_Area_Auxiliar: 'ID_Docente_area_auxiliar';
+        IEO_Docente: 'ID_IEO_Docente';
+        Grado_Escolar_Docente: 'ID_Grado_escolar_docencia';
+        Grado_Docencia: 'ID_Grado_docencia';
+        Area_Docencia: 'ID_Area_docencia';
+        Rol_Institucional: 'ID_Rol_institucional';
+        Tipo_Identificacion: 'ID_Tipo_identificacion';
+        Acompanamiento: 'ID_Acompanamiento';
+        Profesional_Acompanamiento: 'ID_Profesional_Acompanamiento';
+        Linea_Trabajo: 'ID_Linea_trabajo';
+        Visita: 'ID_Visita';
+        Participante: 'ID_Participante';
+        Linea_Trabajo_Visita: 'ID_Linea_trabajo_visita';
+        Logro: 'ID_Logro';
+        Dificultad: 'ID_Dificultad';
+        Acuerdo_Compromiso: 'ID_Acuerdo_compromiso';
+        Area_Linea_Trabajo: 'ID_Area_linea_trabajo';
+        Semana_Corte: 'ID_Semana_corte';
+        Usuario: 'ID_Usuario';
+        Rol_Acceso: 'ID_Rol_acceso';
+        Ciclo: 'ID_Ciclo';
+        Corte: 'ID_Corte';
+        Formacion: '';
+        Asistencia: 'ID_Asistencia';
+        Evidencia: 'ID_Registro_evidencia';
+        Archivo_Jornada: 'ID_Archivo_jornada';
+        Archivo_Habilitado: 'ID_Archivo';
+        Archivo_PA: 'ID_Archivo_pa';
+        Archivo_Informe_PA: 'ID_Archivo_informe_pa';
+    };
+
 };
 
 /**
@@ -168,7 +213,7 @@ interface Grado_Docencia {
     Numero_grado_docencia: number;
     Nombre_grado_docencia: string;
     Tipo_grado_docencia: string;
-    Activo_grado_docencia: boolean;			
+    Activo_grado_docencia: boolean;
 }
 
 /**
@@ -242,6 +287,8 @@ interface Linea_Trabajo {
 }
 
 type EstadoVisita = 'Cancelada' | 'En Curso' | 'Finalizada';
+type EstadoJornada = 'No iniciada' | 'Iniciada' | 'Finalizada' | 'Cancelada';
+type TipoArchivo = 'JORNADA' | 'INFORME_PA' | 'ADMIN';
 
 /**
  * Representa la tabla Visita, que almacena las visitas realizadas.
@@ -357,17 +404,17 @@ interface Usuario {
  * Representa la tabla Evidencia para el registro de archivos copia de jornadas.
  */
 interface Evidencia {
-  ID_Registro_evidencia: number,
-  ID_visita: number,
-  Tipo_evidencia: string,
-  Nombre_archivo_original: string,
-  ID_archivo_drive: string,
-  Fecha_carga: string,
-  MIMEtype: string,
-  Url: string,
-  Estado_evidencia: 'activa' | 'eliminada',
-  Fecha_creacion:string,
-  Fecha_actuallizacion: string
+    ID_Registro_evidencia: number,
+    ID_visita: number,
+    Tipo_evidencia: string,
+    Nombre_archivo_original: string,
+    ID_archivo_drive: string,
+    Fecha_carga: string,
+    MIMEtype: string,
+    Url: string,
+    Estado_evidencia: 'activa' | 'eliminada',
+    Fecha_creacion: string,
+    Fecha_actualizacion: string
 }
 
 /**

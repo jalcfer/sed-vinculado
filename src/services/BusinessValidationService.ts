@@ -22,7 +22,7 @@ class BusinessValidationService {
     // Filtramos para obtener solo los campos que son editables y requeridos.
     // Asumiremos que un campo editable sin valor es un campo requerido que falta.
     // Podrías añadir una propiedad `required: true` a tu template para ser más explícito.
-    const requiredFields = template.fields.filter(field => field.editable);
+    const requiredFields = template.fields.filter(field => field.required);
 
     for (const field of requiredFields) {
       const value = sheet.getRange(field.range).getValue();

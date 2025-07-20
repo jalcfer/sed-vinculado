@@ -14,6 +14,13 @@
 function iniciarJornada_() {
   const ui = SpreadsheetApp.getUi();
   try {
+    // 0. Validar que la jornada no haya sido creada.
+    const jornadaStatus = getJornadaService().getJornadaStatus();
+    if (jornadaStatus !== 'No iniciada') {
+      ui.alert('Jornada ya iniciada', 'No se puede iniciar una nueva jornada porque ya hay una jornada activa.', ui.ButtonSet.OK);
+      return;
+    }
+
     // 1. Pedir el número de participantes
     const result = ui.prompt(
       'Iniciar Jornada',
@@ -79,49 +86,53 @@ function iniciarJornada_() {
   }
 }
 
+
 /**
- * Recolecta los datos de la jornada desde la hoja activa, los valida y los envía al JornadaService para ser registrados.
- * Muestra notificaciones al usuario sobre el resultado de la operación.
+ * [CONTROLADOR] Inicia el flujo para finalizar y guardar una jornada.
+ * Es llamado desde el menú de la hoja de cálculo.
  */
 function finalizarJornada_() {
   const ui = SpreadsheetApp.getUi();
+  const notificationService = getNotificationService();
+  
   try {
-    const activeSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(appConfig.sheets.jornada.name);
-    if (!activeSheet) {
-      throw new Error(`No se encontró la hoja "${appConfig.sheets.jornada.name}" en el archivo activo. Asegúrese de estar en el archivo correcto.`);
+    // 1. Confirmación del Usuario: Es una buena práctica para acciones irreversibles.
+    const response = ui.alert(
+      'Confirmar Finalización',
+      '¿Está seguro de que desea finalizar y guardar esta jornada? Una vez finalizada, la hoja se bloqueará y no podrá realizar más cambios.',
+      ui.ButtonSet.YES_NO
+    );
+
+    if (response !== ui.Button.YES) {
+      notificationService.showToast('Operación cancelada por el usuario.');
+      return; // El usuario presionó "No" o cerró el diálogo.
     }
 
-    // 1. Obtener la plantilla para saber de dónde leer los datos
-    const plantilla = getJornadaSheetTemplate();
-    const jornadaData: { [key: string]: any } = {};
+    // 2. Ejecutar el proceso principal con feedback visual.
+    // Usamos 'runProcessWithFeedback' de tu NotificationService, que es perfecto para esto.
+    notificationService.runProcessWithFeedback(
+      'Finalizando Jornada',
+      'Validando y guardando datos. Este proceso puede tardar un momento...',
+      (reportProgress) => {
+        // Esta función anónima se ejecuta en segundo plano.
 
-    // 2. Extraer los datos de la hoja usando la plantilla como mapa
-    plantilla.fields.forEach(field => {
-      if (field.editable) { // Solo nos interesan los campos que el usuario puede llenar
-        const value = activeSheet.getRange(field.range).getValue();
-        // Usamos el rango como clave para el objeto de datos, que es como lo espera el servicio.
-        jornadaData[field.range] = value;
+        // 3. Llamar al método del SERVICIO que hace todo el trabajo.
+        // El servicio se encargará de reportar el progreso si es necesario.
+        return getJornadaService().finalizarYGuardarJornada(reportProgress);
       }
-    });
-
-    Logger.log("Datos extraídos de la hoja para registrar:", JSON.stringify(jornadaData, null, 2));
-
-    // Aquí se podrían añadir validaciones de los datos recolectados si es necesario.
-
-    // 3. Llamar al servicio para registrar la jornada
-    const resultado = getJornadaService().finalizarJornada(jornadaData);
-
-    if (resultado.success) {
-      ui.alert('Éxito', resultado.message, ui.ButtonSet.OK);
-    } else {
-      throw new Error(resultado.message);
-    }
+    );
 
   } catch (e) {
     const error = e as Error;
-    Logger.log(`Error en registrarJornada_: ${error.message}\n${error.stack}`);
-    ui.alert('Error', `No se pudo registrar la jornada: ${error.message}`, ui.ButtonSet.OK);
+    // Capturamos cualquier error que pueda ocurrir ANTES de llamar al servicio.
+    notificationService.showError(`Error crítico al intentar finalizar la jornada: ${error.message}`, error);
+  } finally {
+    // 4. Refrescar el menú AL FINAL, pase lo que pase.
+    // Esto asegurará que el título del menú muestre "Finalizada" si todo fue bien,
+    // o que se mantenga "En Curso" si hubo un error en el proceso.
+    buildDynamicMenu({} as GoogleAppsScript.Events.DocsOnOpen);
   }
+
 }
 
 function getLineasDeTrabajoSeleccionadas_Modal(): string[] {

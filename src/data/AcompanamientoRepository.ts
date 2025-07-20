@@ -28,9 +28,10 @@ class AcompanamientoRepository_ {
     const resultado = this.db.selectFrom('Acompanamiento', [
       'Institucion_educativa',
       'Nombre_carpeta',
-      'ID_Folder_principal',
       'ID_Profesional_Acompanamiento',
+      'ID_Profesional_acompanamiento',
       'Nombre_profesional_acompanamiento',
+      'ID_Folder_principal',
       'ID_Folder_informes'
     ])
     .join('IEO')
@@ -41,11 +42,12 @@ class AcompanamientoRepository_ {
     if (resultado.length === 0) return null;
 
     const data = resultado[0] as any;
+
     return {
       idFolderPrincipal: data['ID_Folder_principal'],
       nombreIEO: data['Institucion_educativa'],
       nombreCarpeta: data['Nombre_carpeta'],
-      idPa: data['ID_Profesional_Acompanamiento'],
+      idPa: data['ID_Profesional_acompanamiento'],
       nombrePa: data['Nombre_profesional_acompanamiento'],
       idFolderInformes: data['ID_Folder_informes']
     };

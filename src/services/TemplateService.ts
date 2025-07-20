@@ -57,6 +57,7 @@ class TemplateService {
       if (field.label) range.setValue(field.label);
       if (field.align) range.setHorizontalAlignment(field.align);
       if (field.verticalAlign) range.setVerticalAlignment(field.verticalAlign);
+      if (field.wrapStrategy) range.setWrapStrategy(SpreadsheetApp.WrapStrategy[field.wrapStrategy]);
       if (field.rotation) range.setTextRotation(field.rotation);
       if (field.fontWeight) range.setFontWeight(field.fontWeight);
 

@@ -58,6 +58,36 @@ class CatalogoRepository_ {
     // Se asume que la tabla Corte tiene las columnas ID_Corte y Nombre_corte.
     return this.db.selectFrom('Corte', ['ID_Corte', 'Nombre_corte']).execute();
   }  
+
+  /**
+   * [NUEVO MÉTODO]
+   * Busca el ID de un registro en una tabla de catálogo basado en el valor de otra columna.
+   * @param tableName El nombre de la tabla a consultar (ej. 'Linea_Trabajo').
+   * @param valueColumn La columna donde buscar el valor (ej. 'Nombre_linea_trabajo').
+   * @param valueToFind El valor a buscar (ej. 'Planes de Estudio').
+   * @returns El ID del registro encontrado, o null si no se encuentra.
+   */
+  public findIdByValue(tableName: keyof typeof schema.tableMap, valueColumn: string, valueToFind: string): number | null {
+    try {
+      // La clave primaria se obtiene del schema para hacer la consulta más genérica.
+      const primaryKey = schema.primaryKeyMap[tableName];
+      if (!primaryKey) {
+        throw new Error(`No se encontró una clave primaria definida para la tabla '${tableName}' en el schema.`);
+      }
+
+      const result = this.db.selectFrom(tableName, [primaryKey])
+        .where(valueColumn, '=', valueToFind)
+        .execute();
+      
+      return result.length > 0 ? result[0][primaryKey] : null;
+
+    } catch (e) {
+      const error = e as Error;
+      Logger.log(`Error en findIdByValue para la tabla ${String(tableName)}: ${error.message}`);
+      return null;
+    }
+  }
+
 }
 
 function getCatalogoRepository(): CatalogoRepository_ {

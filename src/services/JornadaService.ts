@@ -46,6 +46,8 @@ class JornadaService {
     const carpetaAcompanamiento = this.crearCarpetasBase(idFolderPrincipal, nombreCarpeta);
     reportProgress('Estructura de carpetas base verificada/creada.');
 
+
+    Logger.log(`infoAcompanamiento: ${JSON.stringify(infoAcompanamiento)}`);
     // 2.1 Asegurar que el archivo de informe del PA exista
     this.ensurePaStructureExists(infoAcompanamiento, reportProgress);
 
@@ -149,19 +151,24 @@ class JornadaService {
    * @param reportProgress Función para notificar el progreso.
    */
   private ensurePaStructureExists(paInfo: any, reportProgress: (message: string) => void): void {
+    Logger.log(`Iniciando ensurePaStructureExists para PA: ${paInfo.nombrePa} (ID: ${paInfo.idPa})`);
     // 1. Crear o encontrar la carpeta "Informes" y actualizar la BD si es necesario.
     let informesFolderId = paInfo.idFolderInformes;
     if (!informesFolderId) {
       reportProgress('Creando carpeta "Informes" para el PA...');
+      Logger.log(`ID de carpeta principal del PA: ${paInfo.idFolderPrincipal}`);
       const informesFolder = this.driveUtils.findOrCreateFolder(paInfo.idFolderPrincipal, 'Informes');
       informesFolderId = informesFolder.getId();
       getAcompanamientoRepository().updatePaFolderInformes(paInfo.idPa, informesFolderId);
       reportProgress('Carpeta "Informes" creada y registrada.');
+      Logger.log(`Carpeta "Informes" creada con ID: ${informesFolderId}`);
     } else {
       reportProgress('Carpeta "Informes" ya existe.');
+      Logger.log(`Carpeta "Informes" ya existe con ID: ${informesFolderId}`);
     }
 
     // 2. Verificar si el archivo de informe del PA ya existe.
+    Logger.log('Verificando si el archivo de informe del PA ya existe...');
     const paRepo = getPaRepository();
     const existingFile = paRepo.findPaFileByPaId(paInfo.idPa);
     if (existingFile) {
@@ -171,16 +178,19 @@ class JornadaService {
 
     // 3. Si no existe, crearlo dentro de la carpeta "Informes".
     reportProgress(`Creando archivo "Informe de Acompañamiento" para ${paInfo.nombrePa}...`);
+    Logger.log(`Creando archivo de informe en la carpeta: ${informesFolderId}`);
     const fileName = `Informe de Acompañamiento - ${paInfo.nombrePa}`;
 
     const sourceFileId = SpreadsheetApp.getActiveSpreadsheet().getId();
     const newFile = this.driveUtils.copyFile(sourceFileId, informesFolderId, fileName);
     const newFileId = newFile.getId();
     reportProgress(`Archivo copia creado con ID: ${newFileId}`);
+    Logger.log(`Archivo de informe creado con ID: ${newFileId}`);
 
     // Limpiar el archivo copia, dejando solo una hoja llamada "Jornadas".
     this.driveUtils.limpiarSpreadsheet(newFileId, 'Jornadas');
     reportProgress(`Archivo copia limpiado y preparado.`);
+    Logger.log('Archivo de informe limpiado y preparado.');
 
     paRepo.createPaFileRecord(paInfo.idPa, newFileId);
     reportProgress(`Archivo de informe para PA registrado en la base de datos.`);
@@ -249,10 +259,13 @@ class JornadaService {
     });
     reportProgress(`Visita inicial creada con ID: ${nuevaVisitaId}`);
     // 6. Actualizar Archivo_Jornada con el nuevo ID_Visita
-    getJornadaRepository().linkVisitaToJornadaFile(info.ID_Archivo_jornada, nuevaVisitaId);
+    getJornadaRepository().updateArchivoJornada(info.ID_Archivo_jornada, {
+      ID_Visita: String(nuevaVisitaId),
+      Estado_archivo_jornada: 'activo',
+      Fecha_actualizacion: new Date().toISOString()
+    });
+
     const ieoIdAsString = Math.floor(info.ID_IEO).toString();
-
-
     PropertiesService.getScriptProperties().setProperty(appConfig.properties.JORNADA_STATUS_KEY, 'INICIADA');
     PropertiesService.getScriptProperties().setProperty(appConfig.properties.ID_IEO_KEY, ieoIdAsString);
     PropertiesService.getScriptProperties().setProperty(appConfig.properties.NOMBRE_IEO_KEY, info.Institucion_educativa);
@@ -261,7 +274,7 @@ class JornadaService {
 
     reportProgress(`Archivo de jornada ${info.ID_Archivo_jornada} actualizado con el ID de visita ${nuevaVisitaId}.`);
     Logger.log(`Jornada ${info.Numero_jornada} iniciada con éxito. Visita ID: ${nuevaVisitaId}`);
-    
+
     // 7. Devolver datos para la UI
     return {
       fecha: fechaActual,
@@ -271,81 +284,145 @@ class JornadaService {
   }
 
   /**
-   * Finaliza una jornada, registrando los datos finales en la base de datos y actualizando la hoja de cálculo.
-   * @param jornadaData Un objeto con los datos de la jornada a registrar.
+   * Orquesta el proceso completo de validación, persistencia y protección
+   * de una jornada de acompañamiento.
+   * @param reportProgress Función de callback para notificar el progreso a la UI.
+   * @returns Un string con el mensaje de éxito final.
    */
-  public finalizarJornada(jornadaData: any): { success: boolean; message: string } {
-    try {
-      const activeSheet = SpreadsheetApp.getActiveSpreadsheet();
-      const fileId = activeSheet.getId();
+  public finalizarYGuardarJornada(reportProgress: (message: string) => void): string {
+    // --- 1. OBTENER CONTEXTO Y VALIDAR ---
+    reportProgress('Obteniendo información de la sesión...');
+    const props = PropertiesService.getScriptProperties();
+    const idVisitaStr = props.getProperty(appConfig.properties.ID_JORNADA_KEY);
 
-      // 1. Obtener la información de la jornada desde la BD usando el ID del archivo
-      const jornadaInfo = getJornadaRepository().getJornadaInfoByFileId(fileId);
-      if (!jornadaInfo) {
-        throw new Error('No se pudo encontrar la información de la jornada para este archivo.');
-      }
-
-      const { ID_Acompanamiento, Numero_jornada } = jornadaInfo;
-
-      // 2. Validar que la jornada no esté ya registrada (finalizada)
-      // (Lógica a implementar si es necesario, por ejemplo, chequear un campo "estado")
-
-      // 3. Llamar al repositorio para actualizar la base de datos
-      getJornadaRepository().updateJornada(ID_Acompanamiento, Numero_jornada, jornadaData);
-
-      // 4. Actualizar y proteger la hoja de cálculo
-      const sheet = activeSheet.getSheetByName(appConfig.sheets.jornada.name);
-      if (!sheet) {
-        throw new Error(`No se encontró la hoja "${appConfig.sheets.jornada.name}" en el archivo activo.`);
-      }
-
-      // Se utiliza el JornadaSheetService para actualizar y proteger los campos
-      const plantilla = getJornadaSheetTemplate();
-      getJornadaSheetService().updateAndProtectSheetFields(sheet, plantilla, jornadaData);
-
-      Logger.log(`Jornada ${Numero_jornada} del acompañamiento ${ID_Acompanamiento} registrada con éxito.`);
-
-      return { success: true, message: 'Jornada registrada con éxito.' };
-
-    } catch (e) {
-      const error = e as Error;
-      Logger.log(`Error al registrar la jornada: ${error.message}\n${error.stack}`);
-      return { success: false, message: `Error al registrar la jornada: ${error.message}` };
+    if (!idVisitaStr) {
+      throw new Error("No se encontró un ID de visita activo en la sesión. No se puede finalizar.");
     }
+    const idVisita = parseInt(idVisitaStr, 10);
+
+    reportProgress('Validando datos de la jornada...');
+    const validationResult = this.validateDataForFinalizacion();
+    if (!validationResult.isValid) {
+      // Si la validación falla, lanzamos un error que será capturado por el controlador.
+      throw new Error(validationResult.message);
+    }
+
+    // --- 2. RECOPILAR Y PERSISTIR DATOS ---
+    reportProgress('Guardando datos principales...');
+    this.persistirDatosVisita(idVisita);
+
+    reportProgress('Guardando líneas de trabajo...');
+    // Este método devuelve los IDs de los registros creados para usarlos después.
+    const lineasVisitaMap = this.persistirLineasTrabajo(idVisita);
+
+    reportProgress('Guardando logros, dificultades y acuerdos...');
+    this.persistirLDA(idVisita, lineasVisitaMap);
+
+    reportProgress('Registrando evidencias...');
+    // Llamamos al servicio de evidencias para que se encargue de su lógica.
+    getEvidenciaService().persistEvidenciasFromProperties(idVisita);
+
+    // --- 3. ACTUALIZAR ESTADO Y PROTEGER LA HOJA ---
+    reportProgress('Aplicando protecciones a la hoja...');
+    getJornadaSheetService().protegerHojaCompleta();
+
+    reportProgress('Actualizando estado final de la jornada...');
+    const fileId = SpreadsheetApp.getActiveSpreadsheet().getId();
+    getJornadaRepository().actualizarEstadoArchivoJornadaByArchivoId(fileId, 'Finalizada');
+
+    this.actualizarEstadoFinal();
+
+    reportProgress('Limpiando datos de sesión...');
+    this.limpiarCacheDeSesion();
+
+    return '¡Jornada finalizada y guardada con éxito! La hoja ha sido bloqueada.';
+  }
+
+  // --- MÉTODOS PRIVADOS DE AYUDA ---
+
+  /**
+   * [HELPER] Lee los datos finales de la visita desde la hoja y los actualiza en la BD.
+   */
+  private persistirDatosVisita(idVisita: number): void {
+    const sheet = getJornadaSheetService().getActiveJornadaSheet();
+
+    const estadoFinal: EstadoVisita = 'Finalizada';
+
+    const jornadaData = {
+      Tipo_Visita: sheet.getRange(appConfig.sheets.jornada.fields.tipoJornada.range).getValue(),
+      Objetivo_visita: sheet.getRange(appConfig.sheets.jornada.fields.objetivoJornada.range).getValue(),
+      DuracionHoras: sheet.getRange(appConfig.sheets.jornada.fields.horasJornada.range).getValue(),
+      Estado: estadoFinal, 
+      Fecha_actualizacion: new Date().toISOString()
+    };
+    getJornadaRepository().updateVisita(idVisita, jornadaData);
   }
 
   /**
-   * Sube archivos de evidencia a Google Drive
-   * @param visitaId El ID de la visita asociada.
-   * @param archivos Un objeto con los archivos a subir
+   * [HELPER] Lee las líneas de trabajo, las guarda en la BD y devuelve un mapa para su uso posterior.
    */
-  public subirEvidencias(visitaId: number, archivos: { asistencia: any, transporte: any, fotos: any[] }): void {
-    Logger.log(`Subiendo evidencias para la visita ${visitaId}: ${archivos} archivos.`);
+  private persistirLineasTrabajo(idVisita: number): Map<string, number> {
+    const repo = getJornadaRepository();
+    const lineasNombres = this.getLineasDeTrabajoFromSheet();
+    const lineasVisitaMap = new Map<string, number>();
 
-    const jornadaRepository = getJornadaRepository();
-    const evidenciaFolderId = ""; // Obtener de la base de datos
+    lineasNombres.forEach(nombreLinea => {
+      // Necesitamos el ID de la línea de trabajo, no solo el nombre.
+      const idLineaTrabajo = getCatalogoRepository().findIdByValue('Linea_Trabajo', 'Nombre_linea_trabajo', nombreLinea);
+      if (idLineaTrabajo) {
+        const idLineaVisita = repo.createLineaTrabajoVisita(idVisita, idLineaTrabajo);
+        lineasVisitaMap.set(nombreLinea, idLineaVisita);
+      }
+    });
+    return lineasVisitaMap;
+  }
 
-    if (archivos.asistencia) {
-      const archivoAsistencia = this.driveUtils.uploadFile(evidenciaFolderId, archivos.asistencia.name, archivos.asistencia.data)
-      const fileInfo = {
-        nombre: archivos.asistencia.name,
-        idDrive: archivoAsistencia.getId(),
-        url: archivoAsistencia.getUrl(),
-        tipo: archivos.asistencia.tipoEvidencia,
-      };
-      jornadaRepository.registrarEvidencia(visitaId, fileInfo);
+  /**
+   * [HELPER] Lee el JSON de LDA y lo guarda en la BD.
+   */
+  private persistirLDA(idVisita: number, lineasVisitaMap: Map<string, number>): void {
+    const ldaData = this.getLDAFromProperties();
+    if (!ldaData) return;
+
+    const repo = getJornadaRepository();
+    const logrosParaInsertar: any[] = [];
+    const dificultadesParaInsertar: any[] = [];
+    const acuerdosParaInsertar: any[] = [];
+
+    for (const nombreLinea in ldaData) {
+      const idLineaVisita = lineasVisitaMap.get(nombreLinea);
+      if (idLineaVisita) {
+        ldaData[nombreLinea].logros.forEach(desc => logrosParaInsertar.push({ ID_Linea_trabajo_visita: idLineaVisita, Descripcion_logro: desc }));
+        ldaData[nombreLinea].dificultades.forEach(desc => dificultadesParaInsertar.push({ ID_Linea_trabajo_visita: idLineaVisita, Descripcion_dificultad: desc }));
+        ldaData[nombreLinea].acuerdos.forEach(desc => acuerdosParaInsertar.push({ ID_Linea_trabajo_visita: idLineaVisita, Descripcion_acuerdo_compromiso: desc }));
+      }
     }
 
-    if (archivos.transporte) {
-      const archivoTransporte = this.driveUtils.uploadFile(evidenciaFolderId, archivos.transporte.name, archivos.transporte.data)
-      const fileInfo = {
-        nombre: archivos.transporte.name,
-        idDrive: archivoTransporte.getId(),
-        url: archivoTransporte.getUrl(),
-        tipo: archivos.transporte.tipoEvidencia,
-      };
-      jornadaRepository.registrarEvidencia(visitaId, fileInfo);
-    }
+    // Llamar a los métodos de inserción masiva del repositorio.
+    if (logrosParaInsertar.length > 0) repo.batchInsertLogros(logrosParaInsertar);
+    if (dificultadesParaInsertar.length > 0) repo.batchInsertDificultades(dificultadesParaInsertar);
+    if (acuerdosParaInsertar.length > 0) repo.batchInsertAcuerdos(acuerdosParaInsertar);
+  }
+
+  /**
+   * [HELPER] Actualiza la propiedad de estado a 'Finalizada'.
+   */
+  private actualizarEstadoFinal(): void {
+    PropertiesService.getScriptProperties().setProperty(appConfig.properties.JORNADA_STATUS_KEY, 'Finalizada');
+  }
+
+  /**
+   * [HELPER] Limpia todas las propiedades de la sesión de jornada.
+   */
+  private limpiarCacheDeSesion(): void {
+    const props = PropertiesService.getScriptProperties();
+    const keysToDelete = [
+      appConfig.properties.LOGROS_DIFICULTADES_ACUERDOS_KEY,
+      appConfig.properties.EVIDENCIAS_JSON_KEY,
+      appConfig.properties.JORNADA_IS_DIRTY_KEY,
+      // Añade aquí cualquier otra clave de sesión que quieras limpiar
+    ];
+    keysToDelete.forEach(key => props.deleteProperty(key));
   }
 
   /**
@@ -445,26 +522,8 @@ class JornadaService {
     return null;
   }
 
-  // --- Este es el método que usaremos al final del proceso ---
-  /**
-   * Lee el JSON de LDA desde PropertiesService y lo guarda en la BD.
-   * @param idVisita El ID de la visita a la que se asociarán estos registros.
-   */
-  public persistLDAFromPropertiesToDB(idVisita: number): void {
-    const ldaData = this.getLDAFromProperties();
-    if (!ldaData) {
-      Logger.log("No se encontraron datos LDA en Properties para persistir en la BD.");
-      return;
-    }
-
-    // El repositorio debería tener métodos para insertar estos datos.
-    // getJornadaRepository().batchInsertLogros(idVisita, ldaData);
-    // getJornadaRepository().batchInsertDificultades(idVisita, ldaData);
-    // getJornadaRepository().batchInsertAcuerdos(idVisita, ldaData);
-
-    Logger.log(`LDA para la visita ${idVisita} persistidos correctamente en la BD.`);
-    // Opcional: ¿limpiar la propiedad después de guardar?
-    // PropertiesService.getScriptProperties().deleteProperty(appConfig.properties.LOGROS_DIFICULTADES_ACUERDOS_KEY);
+  public getJornadaStatus(): EstadoJornada {
+    return (PropertiesService.getScriptProperties().getProperty(appConfig.properties.JORNADA_STATUS_KEY) || 'No Iniciada') as EstadoJornada;
   }
 }
 

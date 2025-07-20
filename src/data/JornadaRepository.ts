@@ -201,23 +201,12 @@ class JornadaRepository {
   }
 
   /**
-   * Vincula una visita recién creada con su correspondiente archivo de jornada.
-   * @param idArchivoJornada El ID del registro en la tabla Archivo_Jornada.
-   * @param idVisita El ID de la visita a vincular.
-   * @returns El número de filas actualizadas (debería ser 1).
+   * Actualiza un registro existente en la tabla 'Archivo_Jornada'.
+   * @param archivoJornadaId El ID del archivo a actualizar (que es la PK).
+   * @param data Un objeto con las columnas y valores a modificar.
    */
-  linkVisitaToJornadaFile(idArchivoJornada: string, idVisita: number): number {
-    const updatedRows = this.db.update(
-      'Archivo_Jornada',
-      { ID_Visita: idVisita },
-      { ID_Archivo_jornada: idArchivoJornada }
-    );
-    if (updatedRows > 0) {
-      Logger.log(`Archivo_Jornada ${idArchivoJornada} actualizado para enlazar con Visita ID: ${idVisita}`);
-    } else {
-      Logger.log(`No se pudo actualizar Archivo_Jornada ${idArchivoJornada} para enlazar con Visita ID: ${idVisita}`);
-    }
-    return updatedRows;
+  public updateArchivoJornada(archivoJornadaId: string, data: Partial<Archivo_Jornada>): void {
+    this.db.update('Archivo_Jornada', data, { ID_Archivo_jornada: archivoJornadaId });
   }
 
   /**
@@ -306,11 +295,26 @@ class JornadaRepository {
    * @param nuevoEstado Nuevo estado a establecer ("creado" | "activo" | "finalizado").
    * @returns `true` si la actualización fue exitosa, `false` en caso contrario.
    */
-  actualizarEstadoArchivoJornada(archivoJornadaId: number, nuevoEstado: string): boolean {
+  actualizarEstadoArchivoJornadaById(archivoJornadaId: number, nuevoEstado: string): boolean {
     const updatedRows = this.db.update(
       'Archivo_Jornada',
       { Estado_archivo_jornada: nuevoEstado },
       { ID_Archivo_jornada: archivoJornadaId }
+    );
+    return updatedRows > 0;
+  }
+
+  /**
+   * Actualiza el estado de un archivo de jornada.
+   * @param archivoId ID de drive del archivo de jornada a actualizar.
+   * @param nuevoEstado Nuevo estado a establecer ("creado" | "activo" | "finalizado").
+   * @returns `true` si la actualización fue exitosa, `false` en caso contrario.
+   */
+  actualizarEstadoArchivoJornadaByArchivoId(archivoId: string, nuevoEstado: string): boolean {
+    const updatedRows = this.db.update(
+      'Archivo_Jornada',
+      { Estado_archivo_jornada: nuevoEstado },
+      { ID_archivo_drive: archivoId }
     );
     return updatedRows > 0;
   }
@@ -450,6 +454,99 @@ class JornadaRepository {
     
     return result.length > 0 ? result[0].ID_folder_evidencias : null;
   }  
+
+  
+  /**
+   * Actualiza un registro existente en la tabla 'Visita'.
+   * @param idVisita El ID de la visita a actualizar.
+   * @param data Un objeto con las columnas y valores a modificar.
+   */
+  public updateVisita(idVisita: number, data: Partial<Visita>): void {
+    this.db.update('Visita', data, { ID_Visita: idVisita });
+  }
+
+  /**
+   * Crea un nuevo registro en la tabla de unión 'Linea_Trabajo_Visita'.
+   * @param idVisita El ID de la visita.
+   * @param idLineaTrabajo El ID de la línea de trabajo.
+   * @returns El ID del nuevo registro creado.
+   */
+  public createLineaTrabajoVisita(idVisita: number, idLineaTrabajo: number): number {
+    const data = {
+      ID_Visita: idVisita,
+      ID_Linea_trabajo: idLineaTrabajo
+      // Puedes añadir más campos aquí si la tabla los requiere
+    };
+    return this.db.insertInto('Linea_Trabajo_Visita', data);
+  }
+
+  /**
+   * Inserta múltiples registros de logros en la base de datos.
+   * @param logros Un array de objetos, cada uno representando un logro.
+   */
+  public batchInsertLogros(logros: { ID_Linea_trabajo_visita: number; Descripcion_logro: string; }[]): void {
+    // Asumimos que la librería central tiene un método batchInsert,
+    // o si no, iteramos.
+    logros.forEach(logro => this.db.insertInto('Logro', logro));
+  }
+
+  /**
+   * Inserta múltiples registros de dificultades en la base de datos.
+   * @param dificultades Un array de objetos, cada uno representando una dificultad.
+   */
+  public batchInsertDificultades(dificultades: { ID_Linea_trabajo_visita: number; Descripcion_dificultad: string; }[]): void {
+    dificultades.forEach(dificultad => this.db.insertInto('Dificultad', dificultad));
+  }
+
+  /**
+   * Inserta múltiples registros de acuerdos y compromisos en la base de datos.
+   * @param acuerdos Un array de objetos, cada uno representando un acuerdo.
+   */
+  public batchInsertAcuerdos(acuerdos: { ID_Linea_trabajo_visita: number; Descripcion_acuerdo_compromiso: string; }[]): void {
+    acuerdos.forEach(acuerdo => this.db.insertInto('Acuerdo_Compromiso', acuerdo));
+  }
+
+  /**
+   * Determina el tipo de un archivo consultando la base de datos.
+   * @param fileId El ID del archivo de Google Drive.
+   * @returns El tipo de archivo ('JORNADA', 'ADMIN', etc.) o 'INDEFINIDO'.
+   */
+  public getFileTypeById(fileId: string): TipoArchivo {
+    // Lógica para determinar el tipo. Podríamos consultar varias tablas.
+    
+    // 1. ¿Es un archivo de Jornada?
+    const jornadaResult = this.db.selectFrom('Archivo_Jornada', ['ID_Archivo_jornada'])
+      .where('ID_archivo_drive', '=', fileId)
+      .execute();
+      
+    if (jornadaResult.length > 0) {
+      return 'JORNADA';
+    }
+    
+    // 2. ¿Es un archivo de Jornada?
+    const informePaResult = this.db.selectFrom('Archivo_PA', ['ID_Archivo_pa'])
+      .where('ID_archivo_drive', '=', fileId)
+      .execute();
+      
+    if (informePaResult.length > 0) {
+      return 'INFORME_PA';
+    }
+
+    // // 2. ¿Es un archivo de Admin? (Necesitamos una forma de identificarlo)
+    // // Asumiremos que los archivos de admin también se registran, quizás en 'Archivo_Habilitado' con un tipo.
+    // // Esta parte puede necesitar ajustarse a tu schema exacto.
+    // const adminResult = this.db.selectFrom('Archivo_Habilitado', ['Tipo_Archivo'])
+    //   .where('ID_Archivo', '=', fileId)
+    //   .where('Tipo_Archivo', '=', 'admin') // Asumiendo que tienes una columna 'Tipo_Archivo'
+    //   .execute();
+    // 
+    // if (adminResult.length > 0) {
+    //   return 'ADMIN';
+    // }
+
+    // 3. Si no se encuentra en ninguna tabla conocida
+    return 'ADMIN';
+  }
   
 }
 

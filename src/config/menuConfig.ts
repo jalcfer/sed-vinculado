@@ -12,6 +12,7 @@ interface MenuItem {
   icon?: string; // El ícono a mostrar junto al label.
   functionName?: string; // La función global a ejecutar (si no es un submenú padre).
   roles: ('ADMIN' | 'OWNER' | 'PA')[]; // Roles que pueden ver este menú.
+  fileTypes?: (TipoArchivo)[];
   subItems?: MenuItem[]; // Array de sub-elementos de menú.
   isSeparator?: boolean; // Indica si el elemento es un separador.
   labelStates?: {
@@ -44,6 +45,7 @@ const menuConfig: MenuItem[] = [
         label: 'Estado de la Jornada', // Un label base por si algo falla
         functionName: 'dummyFunction', // No hace nada al hacer clic
         roles: ['ADMIN', 'OWNER', 'PA'],
+        fileTypes: ['JORNADA'], // Permite ver este menú solo si el archivo es de tipo JORNADA
         dynamicLabel: {
           // La plantilla de cómo se debe ver el título.
           template: 'Jornada {numero} - {status}{dirtyMark}',
@@ -64,25 +66,30 @@ const menuConfig: MenuItem[] = [
         label: 'Admin',
         icon: '⚙️',
         roles: ['ADMIN', 'OWNER'],
+        fileTypes: ['JORNADA', 'ADMIN', 'INFORME_PA'],
         subItems: [
           {
             label: 'Preparar documento admin',
             functionName: 'prepararDocumentoAdmin',
             roles: ['ADMIN', 'OWNER'],
+            fileTypes: ['ADMIN'],
           },
           {
             label: 'Asignar PA a IEO',
             functionName: 'asignarPAIEO',
             roles: ['ADMIN', 'OWNER'],
+            fileTypes: ['JORNADA', 'ADMIN'],
           },
           {
             label: 'Crear archivos de Jornada',
             functionName: 'showJornadaCreationDialog',
             roles: ['ADMIN', 'OWNER'],
+            fileTypes: ['ADMIN'],
           },
           {
             isSeparator: true,
             roles: ['ADMIN', 'OWNER'],
+            fileTypes: ['ADMIN'],
             label: 'separator_migration',
           },
           {
@@ -90,6 +97,7 @@ const menuConfig: MenuItem[] = [
             icon: '🚚',
             functionName: 'showMigrationDialog',
             roles: ['ADMIN', 'OWNER'],
+            fileTypes: ['ADMIN'],
           },
         ],
       },
@@ -97,24 +105,28 @@ const menuConfig: MenuItem[] = [
         label: 'Informes',
         icon: '🧑‍🏫',
         roles: ['OWNER'],
+        fileTypes: ['INFORME_PA'],
         subItems: [
           {
             label: 'Actualizar Jornadas',
             icon: '🔄',
             functionName: 'actualizarJornadasPA',
             roles: ['OWNER'],
+            fileTypes: ['INFORME_PA'],
           },
           {
             label: 'Generar Informe Preliminar',
             icon: '📝',
             functionName: 'generarInformePreliminar_',
             roles: ['OWNER'],
+            fileTypes: ['INFORME_PA'],
           },
           {
             label: 'Reportar Informe Bimensual',
             icon: '📊',
             functionName: 'showInformeDialog',
             roles: ['OWNER'],
+            fileTypes: ['INFORME_PA'],
           }
 
 
@@ -123,13 +135,15 @@ const menuConfig: MenuItem[] = [
       {
         label: 'Gestión Jornadas',
         icon: '📇',
-        roles: ['PA'],
+        roles: ['PA','OWNER'],
+        fileTypes: ['JORNADA'],
         subItems: [
           {
             label: 'Registrar Jornada',
             icon: '➕',
             functionName: 'iniciarJornada_',
             roles: ['ADMIN', 'PA'],
+            fileTypes: ['JORNADA'],
             labelStates: {
               stateKey: appConfig.properties.JORNADA_STATUS_KEY,
               states: {
@@ -142,18 +156,21 @@ const menuConfig: MenuItem[] = [
             icon: '🎯',
             functionName: 'agregarLogrosPA',
             roles: ['ADMIN', 'PA'],
+            fileTypes: ['JORNADA'],
           },
           {
             label: 'Evidencias',
             icon: '📎',
             functionName: 'agregarEvidenciasPA',
             roles: ['ADMIN', 'PA'],
+            fileTypes: ['JORNADA'],
           },
           {
             label: 'Finalizar y Guardar Jornada',
             icon: '🏁',
-            functionName: 'finalizarJornadaPA',
+            functionName: 'finalizarJornada_',
             roles: ['ADMIN', 'PA'],
+            fileTypes: ['JORNADA'],
             labelStates: {
               stateKey: appConfig.properties.JORNADA_STATUS_KEY,
               states: {
@@ -165,6 +182,7 @@ const menuConfig: MenuItem[] = [
           {
             isSeparator: true,
             roles: ['ADMIN', 'PA'],
+            fileTypes: ['JORNADA'],
             label: 'separator1', // label es requerido, pero no se mostrará
           },
           {
@@ -172,18 +190,21 @@ const menuConfig: MenuItem[] = [
             icon: '➕👤',
             functionName: 'agregarParticipantesPA',
             roles: ['ADMIN', 'PA'],
+            fileTypes: ['JORNADA'],
           },
           {
             label: 'Participante(s)',
             icon: '➖👤',
             functionName: 'eliminarParticipantesPA',
             roles: ['ADMIN', 'PA'],
+            fileTypes: ['JORNADA'],
           },
           {
             label: 'Docente',
             icon: '➕🧑‍🏫',
             functionName: 'showDocenteDialog',
             roles: ['ADMIN', 'PA'],
+            fileTypes: ['JORNADA'],
           }
         ],
       },

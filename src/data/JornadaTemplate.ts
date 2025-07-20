@@ -35,6 +35,7 @@ type JornadaSheetTemplate = {
     fontWeight?: 'normal' | 'bold';
     isPrincipal?: boolean; // Indica si es un campo principal de la jornada
     required?: boolean; // Indica si es un campo obligatorio
+    wrapStrategy?: 'OVERFLOW' | 'WRAP' | 'CLIP';
   }[];
   protections: { range: string; description: string }[];
   fontFamily?: string;
@@ -88,12 +89,12 @@ function getJornadaSheetTemplate(): JornadaSheetTemplate {
       { range: 'B12:H12', label: 'ÁREA:', editable: false, align: 'left', protected: true, fontWeight: 'bold' },
       { range: 'I12:R12', label: '', editable: true, type: 'dropdown', dataSource: { table: 'Area_Linea_Trabajo', valueColumn: 'Nombre_area_linea_trabajo', activeColumn: 'Activo' }, border: { type: 'bottom' }, align: 'left', hidden: true, conditionalVisibility: { field: 'I11:R11', value: 'Planes de Estudio' } },
       { range: 'B13:H13', label: 'OBJETIVO:', editable: false, align: 'left', protected: true, fontWeight: 'bold' },
-      { range: 'I13:R16', label: '', editable: true, type: 'text', border: { type: 'bottom' }, align: 'left' },
+      { range: 'I13:R16', label: '', editable: true, type: 'text', border: { type: 'bottom' }, align: 'left', verticalAlign: 'top', required: true, wrapStrategy: 'WRAP' },
       { range: 'A18:K18', label: 'PARTICIPANTES', editable: false, align: 'center', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
       { range: 'A19:A20', label: 'ROL', editable: false, align: 'center', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
       { range: 'B19:J20', label: 'NOMBRE COMPLETO', editable: false, align: 'center', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
       { range: 'K19:K20', label: 'TOTAL\nPARTICIPANTES', editable: false, align: 'center', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
-      { range: 'L18:N20', label: 'ARE\nDOCENTE', editable: false, align: 'center', verticalAlign: 'middle', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
+      { range: 'L18:N20', label: 'AREA\nDOCENTE', editable: false, align: 'center', verticalAlign: 'middle', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
       { range: 'O18:O20', label: 'GRADOS', editable: false, align: 'center', verticalAlign: 'middle', rotation: 90, border: { type: 'full' }, protected: true, fontWeight: 'bold' },
       { range: 'P18:P20', label: 'HORAS', editable: false, align: 'center', verticalAlign: 'middle', rotation: 90, border: { type: 'full' }, protected: true, fontWeight: 'bold' },
       { range: 'Q18', label: 'LOGROS', editable: false, align: 'center', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
@@ -101,11 +102,11 @@ function getJornadaSheetTemplate(): JornadaSheetTemplate {
       { range: 'S18', label: 'ACUERDOS Y COMPROMISOS', editable: false, align: 'center', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
       { range: 'T18', label: 'EVIDENCIAS', editable: false, align: 'center', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
       { range: 'U18', label: 'OBSERVACIONES SED', editable: false, align: 'center', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
-      { range: 'Q19:Q20', label: '', editable: false, align: 'left', verticalAlign: 'top', border: { type: 'full' }, protected: true },
-      { range: 'R19:R20', label: '', editable: false, align: 'left', verticalAlign: 'top', border: { type: 'full' }, protected: true },
-      { range: 'S19:S20', label: '', editable: false, align: 'left', verticalAlign: 'top', border: { type: 'full' }, protected: true },
-      { range: 'T19:T20', label: '', editable: false, align: 'left', verticalAlign: 'top', border: { type: 'full' }, protected: true },
-      { range: 'U19:U20', label: '', editable: false, align: 'left', verticalAlign: 'top', border: { type: 'full' }, protected: true }
+      { range: 'Q19:Q20', label: '', editable: false, align: 'left', verticalAlign: 'top', border: { type: 'full' }, protected: true, wrapStrategy: 'WRAP' },
+      { range: 'R19:R20', label: '', editable: false, align: 'left', verticalAlign: 'top', border: { type: 'full' }, protected: true, wrapStrategy: 'WRAP' },
+      { range: 'S19:S20', label: '', editable: false, align: 'left', verticalAlign: 'top', border: { type: 'full' }, protected: true, wrapStrategy: 'WRAP' },
+      { range: 'T19:T20', label: '', editable: false, align: 'left', verticalAlign: 'top', border: { type: 'full' }, protected: true, wrapStrategy: 'WRAP' },
+      { range: 'U19:U20', label: '', editable: false, align: 'left', verticalAlign: 'top', border: { type: 'full' }, protected: true, wrapStrategy: 'WRAP' },
     ],
     protections: [
       { range: 'A1:U20', description: 'Protección general de la plantilla, solo campos editables pueden ser modificados' }

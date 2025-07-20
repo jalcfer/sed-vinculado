@@ -24,7 +24,7 @@ class JornadaSheetService {
    * @returns El objeto Sheet de la jornada activa.
    * @throws Error si la hoja activa no es la hoja de Jornada.
    */
-  private getActiveJornadaSheet(): GoogleAppsScript.Spreadsheet.Sheet {
+  public getActiveJornadaSheet(): GoogleAppsScript.Spreadsheet.Sheet {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     // Añadimos una validación para asegurar que estamos en la hoja correcta.
     if (sheet.getName() !== appConfig.sheets.jornada.name) {
@@ -133,10 +133,14 @@ class JornadaSheetService {
     const pFields = appConfig.sheets.jornada.fields.tituloParticipantes.fields;
     for (let i = 0; i < numParticipantes; i++) {
       const currentRow = startRow + i;
-      sheet.getRange(`${pFields.nombreCompleto.startCol}${currentRow}:${pFields.nombreCompleto.endCol}${currentRow}`).merge().clearDataValidations();
-      sheet.getRange(`${pFields.areaDocente.startCol}${currentRow}:${pFields.areaDocente.endCol}${currentRow}`).merge().clearDataValidations();
-      sheet.getRange(`${pFields.gradoDocente.startCol}${currentRow}`).clearDataValidations();
-      sheet.getRange(`${pFields.horasDocente.startCol}${currentRow}`).clearDataValidations();
+      sheet.getRange(`${pFields.nombreCompleto.startCol}${currentRow}:${pFields.nombreCompleto.endCol}${currentRow}`)
+          .merge().clearDataValidations().setHorizontalAlignment('left').setVerticalAlignment('middle');
+      sheet.getRange(`${pFields.areaDocente.startCol}${currentRow}:${pFields.areaDocente.endCol}${currentRow}`)
+        .merge().clearDataValidations().setHorizontalAlignment('left').setVerticalAlignment('middle');
+      sheet.getRange(`${pFields.gradoDocente.startCol}${currentRow}`)
+        .clearDataValidations().setHorizontalAlignment('left').setVerticalAlignment('middle');
+      sheet.getRange(`${pFields.horasDocente.startCol}${currentRow}`)
+        .clearDataValidations().setHorizontalAlignment('left').setVerticalAlignment('middle');
 
       // Aplicar bordes a toda la fila del participante
       const participantRowRange = sheet.getRange(`A${currentRow}:P${currentRow}`);
@@ -144,7 +148,8 @@ class JornadaSheetService {
     }
 
     const formulaCounter = `=COUNTA(${pFields.nombreCompleto.startCol}${startRow}:${pFields.nombreCompleto.startCol}${endRow})`;
-    sheet.getRange(`${pFields.totalParticipantes.startCol}${startRow}:${pFields.totalParticipantes.startCol}${endRow}`).merge().setFormula(formulaCounter).setVerticalAlignment("middle");
+    sheet.getRange(`${pFields.totalParticipantes.startCol}${startRow}:${pFields.totalParticipantes.startCol}${endRow}`)
+        .merge().setFormula(formulaCounter).setVerticalAlignment("middle");
 
     const colsToMergeVertically = [
       appConfig.sheets.jornada.fields.logros.column,
@@ -202,36 +207,76 @@ class JornadaSheetService {
     evidenceCell.setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
   }
 
-  /**
-   * Orquesta la actualización de las celdas de Logros, Dificultades y Acuerdos
-   * basándose en los datos del DTO.
-   * @param ldaData El objeto DTO con los datos a formatear.
-   */
   public actualizarCeldasLDA(ldaData: LogrosDificultadesAcuerdosDTO): void {
     const sheet = this.getActiveJornadaSheet();
-    if (!sheet) return;
-
-    // Limpiar el contenido previo de las celdas
+    
+    // Limpiar contenido previo
     sheet.getRange(appConfig.sheets.jornada.fields.logros.initRange).clearContent();
     sheet.getRange(appConfig.sheets.jornada.fields.dificultades.initRange).clearContent();
     sheet.getRange(appConfig.sheets.jornada.fields.acuerdos.initRange).clearContent();
 
-    // Formatear y escribir cada sección
-    const logrosRichText = this.buildRichTextForLDA(ldaData, 'logros');
-    if (logrosRichText) {
-      sheet.getRange(appConfig.sheets.jornada.fields.logros.initRange).setRichTextValue(logrosRichText);
-    }
+    // Formatear y obtener los objetos de RichText y el texto plano
+    const logrosResult = this.buildRichTextForLDA(ldaData, 'logros');
+    const dificultadesResult = this.buildRichTextForLDA(ldaData, 'dificultades');
+    const acuerdosResult = this.buildRichTextForLDA(ldaData, 'acuerdos');
+    
+    // Escribir en las celdas
+    if (logrosResult.richText) sheet.getRange(appConfig.sheets.jornada.fields.logros.initRange).setRichTextValue(logrosResult.richText);
+    if (dificultadesResult.richText) sheet.getRange(appConfig.sheets.jornada.fields.dificultades.initRange).setRichTextValue(dificultadesResult.richText);
+    if (acuerdosResult.richText) sheet.getRange(appConfig.sheets.jornada.fields.acuerdos.initRange).setRichTextValue(acuerdosResult.richText);
 
-    const dificultadesRichText = this.buildRichTextForLDA(ldaData, 'dificultades');
-    if (dificultadesRichText) {
-      sheet.getRange(appConfig.sheets.jornada.fields.dificultades.initRange).setRichTextValue(dificultadesRichText);
-    }
-
-    const acuerdosRichText = this.buildRichTextForLDA(ldaData, 'acuerdos');
-    if (acuerdosRichText) {
-      sheet.getRange(appConfig.sheets.jornada.fields.acuerdos.initRange).setRichTextValue(acuerdosRichText);
-    }
+    // --- ¡NUEVO PASO! ---
+    // Ajustar la altura de las filas basándose en el texto más largo.
+    this.autoFitLdaRows(
+      sheet,
+      logrosResult.rawText,
+      dificultadesResult.rawText,
+      acuerdosResult.rawText
+    );
   }
+
+
+  /**
+   * [NUEVO MÉTODO]
+   * Calcula y ajusta la altura de las filas de LDA para que todo el texto sea visible.
+   */
+  private autoFitLdaRows(sheet: GoogleAppsScript.Spreadsheet.Sheet, logrosText: string, dificultadesText: string, acuerdosText: string): void {
+    // --- Constantes configurables ---
+    const PIXELS_PER_LINE = 15; // Valor empírico. Puedes ajustarlo (14-18 suele funcionar bien).
+    const MINIMUM_HEIGHT = 42;  // Altura mínima total para el rango (ej. 21px por fila si son 2).
+
+    // 1. Contar las líneas de cada sección
+    const logrosLines = (logrosText.match(/\n/g) || []).length + 1;
+    const dificultadesLines = (dificultadesText.match(/\n/g) || []).length + 1;
+    const acuerdosLines = (acuerdosText.match(/\n/g) || []).length + 1;
+
+    // 2. Encontrar el máximo número de líneas
+    const maxLines = Math.max(logrosLines, dificultadesLines, acuerdosLines);
+
+    // 3. Calcular la altura total necesaria
+    let totalHeight = maxLines * PIXELS_PER_LINE;
+    
+    // Asegurarse de que no sea menor que la altura mínima
+    if (totalHeight < MINIMUM_HEIGHT) {
+      totalHeight = MINIMUM_HEIGHT;
+    }
+
+    // 4. Distribuir la altura entre las filas del rango
+    // Usamos el rango de 'logros' como referencia; todos tienen las mismas filas.
+    const ldaRange = sheet.getRange(appConfig.sheets.jornada.fields.logros.initRange);
+    const startRow = ldaRange.getRow();
+    const numRows = ldaRange.getNumRows();
+
+    if (numRows > 0) {
+      const heightPerRow = Math.ceil(totalHeight / numRows);
+      
+      Logger.log(`Ajustando altura de filas de LDA. Máximo de líneas: ${maxLines}. Altura total: ${totalHeight}px. Filas: ${numRows}. Altura por fila: ${heightPerRow}px.`);
+      
+      for (let i = 0; i < numRows; i++) {
+        sheet.setRowHeight(startRow + i, heightPerRow);
+      }
+    }
+  }  
 
   /**
    * [HELPER PRIVADO] Construye un valor de RichText formateado para una categoría específica (logros, etc.).
@@ -239,7 +284,7 @@ class JornadaSheetService {
    * @param category La clave de la categoría a procesar ('logros', 'dificultades', 'acuerdos').
    * @returns Un objeto RichTextValue construido, o null si no hay datos para esa categoría.
    */
-  private buildRichTextForLDA(ldaData: LogrosDificultadesAcuerdosDTO, category: 'logros' | 'dificultades' | 'acuerdos'): GoogleAppsScript.Spreadsheet.RichTextValue | null {
+  private buildRichTextForLDA(ldaData: LogrosDificultadesAcuerdosDTO, category: 'logros' | 'dificultades' | 'acuerdos'): { richText: GoogleAppsScript.Spreadsheet.RichTextValue | null, rawText: string } {
     const boldStyle = SpreadsheetApp.newTextStyle().setBold(true).build();
     const titleGeneralStyle = SpreadsheetApp.newTextStyle().setBold(true).setFontSize(11).build();
 
@@ -249,7 +294,7 @@ class JornadaSheetService {
     // Verificar si hay datos en la categoría solicitada
     const hayDatos = Object.values(ldaData).some(linea => linea[category] && linea[category].length > 0);
     if (!hayDatos) {
-      return null; // No hay nada que construir
+      return { richText: null, rawText: "" }; // No hay nada que construir
     }
     
     // 1. Título General (si hay datos)
@@ -282,13 +327,93 @@ class JornadaSheetService {
       }
     }
     
+    if (fullText === "") {
+      return { richText: null, rawText: "" };
+    }
+    
     // Construir el objeto RichText
     const richTextBuilder = SpreadsheetApp.newRichTextValue().setText(fullText);
     textStyleRuns.forEach(run => {
       richTextBuilder.setTextStyle(run.start, run.end, run.style);
     });
 
-    return richTextBuilder.build();
+    return { richText: richTextBuilder.build(), rawText: fullText };
+  }
+
+
+  /**
+   * Protege la hoja de jornada completa, haciéndola de solo lectura para la mayoría
+   * de los usuarios, excepto para los administradores y el propietario.
+   */
+  public protegerHojaCompleta(): void {
+    try {
+      const sheet = this.getActiveJornadaSheet();
+      
+      // 1. Obtener al propietario del archivo.
+      const owner = SpreadsheetApp.getActiveSpreadsheet().getOwner();
+      if (!owner) {
+        // En el muy raro caso de que no se pueda determinar un propietario,
+        // protegemos la hoja sin darle permisos a nadie más que al usuario actual.
+        Logger.log("No se pudo determinar el propietario del archivo. La hoja será protegida solo para el usuario actual.");
+        const protection = sheet.protect().setDescription('Jornada Finalizada');
+        protection.removeEditors(protection.getEditors());
+        protection.addEditor(Session.getEffectiveUser());
+        protection.setWarningOnly(false);
+        return;
+      }
+      
+      Logger.log(`Propietario del archivo identificado: ${owner.getEmail()}`);
+
+      // 2. Eliminar todas las protecciones existentes en la hoja para empezar de cero.
+      const proteccionesAnteriores = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+      proteccionesAnteriores.forEach(p => p.remove());
+      const proteccionesDeRango = sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE);
+      proteccionesDeRango.forEach(p => p.remove());
+
+      // 3. Aplicar una nueva protección a toda la hoja.
+      const proteccion = sheet.protect().setDescription(`Jornada Finalizada - Solo editable por ${owner.getEmail()}`);
+      
+      // 4. Configurar los permisos. Esta es la parte clave.
+      // Primero, obtenemos la lista de todos los que ya tienen acceso al archivo.
+      const viewers = proteccion.getEditors();
+      proteccion.removeEditors(viewers); // Les quitamos los permisos de edición que pudieran tener.
+      
+      // Únicamente añadimos al propietario como editor.
+      proteccion.addEditor(owner);
+
+      // 5. Asegurarse de que la protección sea estricta (no solo una advertencia).
+      proteccion.setWarningOnly(false); 
+      
+      Logger.log(`Hoja "${sheet.getName()}" protegida. Único editor permitido: ${owner.getEmail()}`);
+    } catch (e) {
+      const error = e as Error;
+      Logger.log(`Error al intentar proteger la hoja: ${error.message}`);
+      // Lanzamos el error para que el proceso de finalización se detenga si la protección falla.
+      throw new Error(`No se pudo proteger la hoja. Por favor, verifique los permisos. Detalles: ${error.message}`);
+    }
+  }
+
+  /**
+   * [HELPER] Obtiene la lista de correos de los usuarios con rol de Admin.
+   */
+  private getAdminEmailsFromDB(): string[] {
+    // Este método debería interactuar con un repositorio o directamente con la BD
+    // para obtener los correos de los usuarios cuyo rol es 'ADMIN' o 'soporte'.
+    try {
+      const db = SEDCentralLib.getDB();
+      const admins = db.selectFrom('Usuario', ['Email_usuario'])
+                       .join('Rol_Acceso')
+                       .where('Nombre_rol_acceso', '=', 'admin')
+                       .execute();
+      const soportes = db.selectFrom('Usuario', ['Email_usuario'])
+                       .join('Rol_Acceso')
+                       .where('Nombre_rol_acceso', '=', 'soporte')
+                       .execute();
+      return [...admins.map((u: { Email_usuario: any; }) => u.Email_usuario), ...soportes.map((u: { Email_usuario: any; }) => u.Email_usuario)];
+    } catch (e: any) {
+      Logger.log(`No se pudieron obtener los correos de los administradores: ${e.message}`);
+      return [];
+    }
   }
 }
 

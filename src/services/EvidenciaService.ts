@@ -220,6 +220,46 @@ public marcarEvidenciaComoEliminada(idVisita: number, tipoEvidencia: string): Ev
   private actualizarCeldaDeEvidencias(evidenciasActuales: EvidenciaDisplayDTO[]): void {
     getJornadaSheetService().actualizarCeldaEvidencias(evidenciasActuales);
   }
+
+
+  /**
+   * Lee el caché de evidencias de PropertiesService y persiste los registros
+   * 'activos' en la base de datos central.
+   * @param idVisita El ID de la visita a la que se deben asociar las evidencias.
+   */
+  public persistEvidenciasFromProperties(idVisita: number): void {
+    const evidenciasCache = this.getEvidenciasFromProperties();
+    if (!evidenciasCache || evidenciasCache.length === 0) {
+      Logger.log("No hay evidencias en el caché para persistir en la BD.");
+      return;
+    }
+
+    const repo = getEvidenciaRepository();
+    const evidenciasParaInsertar = evidenciasCache.filter(ev => ev.estado === 'activa');
+
+    Logger.log(`Persistiendo ${evidenciasParaInsertar.length} evidencias activas en la BD para la visita ${idVisita}.`);
+
+    evidenciasParaInsertar.forEach(dto => {
+      // Antes de insertar, verificamos si una evidencia de este tipo ya existe,
+      // para evitar duplicados si el proceso se ejecuta más de una vez.
+      const evidenciaExistente = repo.findEvidenciaByTipo(idVisita, dto.tipo);
+      if (!evidenciaExistente) {
+          const record: Omit<Evidencia, 'ID_Registro_evidencia'> = {
+              ID_visita: idVisita,
+              Tipo_evidencia: dto.tipo,
+              Nombre_archivo_original: dto.nombreOriginal,
+              ID_archivo_drive: dto.driveFileId || '', // driveFileId debe existir en el DTO
+              Url: dto.url,
+              MIMEtype: dto.mimeType,
+              Fecha_carga: new Date().toISOString(),
+              Estado_evidencia: 'activa',
+              Fecha_creacion: new Date().toISOString(),
+              Fecha_actualizacion: new Date().toISOString()
+          };
+          repo.create(record);
+      }
+    });
+  }  
 }
 
 /**
