@@ -2,17 +2,6 @@
  * @fileoverview Servicio para ejecutar migraciones de datos y archivos.
  */
 
-interface Evidencia {
-  ID_Registro_evidencia: number,
-  ID_visita: number,
-  Tipo_evidencia: string,
-  Nombre_archivo_original: string,
-  ID_archivo_drive: string,
-  Fecha_carga: string,
-  MIMEtype: string,
-  Url: string
-}
-
 
 class MigrationService_ {
   private static instance: MigrationService_;

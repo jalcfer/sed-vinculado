@@ -257,10 +257,11 @@ class JornadaService {
     PropertiesService.getScriptProperties().setProperty(appConfig.properties.ID_IEO_KEY, ieoIdAsString);
     PropertiesService.getScriptProperties().setProperty(appConfig.properties.NOMBRE_IEO_KEY, info.Institucion_educativa);
     PropertiesService.getScriptProperties().setProperty(appConfig.properties.ID_JORNADA_KEY, String(nuevaVisitaId));
+    PropertiesService.getScriptProperties().setProperty(appConfig.properties.JORNADA_NUMERO_KEY, String(info.Numero_jornada));
 
     reportProgress(`Archivo de jornada ${info.ID_Archivo_jornada} actualizado con el ID de visita ${nuevaVisitaId}.`);
     Logger.log(`Jornada ${info.Numero_jornada} iniciada con éxito. Visita ID: ${nuevaVisitaId}`);
-
+    
     // 7. Devolver datos para la UI
     return {
       fecha: fechaActual,

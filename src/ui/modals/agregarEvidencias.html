@@ -9,6 +9,20 @@
     body { font-family: Roboto, sans-serif; padding: 20px; }
     .file-field .btn, .btn { background-color: #00796b; }
     .file-field .btn:hover, .btn:hover { background-color: #00897b; }
+    /* Forzar color de botones Materialize deshabilitados */
+    .file-field .btn[disabled], .btn[disabled],
+    .file-field .btn:disabled, .btn:disabled {
+      background-color: #bdbdbd !important;
+      color: #757575 !important;
+      cursor: not-allowed !important;
+      box-shadow: none !important;
+      opacity: 1 !important;
+      pointer-events: none !important;
+    }
+    .file-field .btn[disabled] i, .btn[disabled] i,
+    .file-field .btn:disabled i, .btn:disabled i {
+      color: #757575 !important;
+    }
     .progress-container { margin-top: 15px; }
     .hidden { display: none; }
     .file-summary { font-size: 0.9em; color: #757575; margin-left: 10px; }
@@ -62,6 +76,8 @@
   </div>
   <div id="uploadStatus" style="margin-top:10px;"></div>
 
+  <div id="evidenciasActualesContainer" style="margin-top:30px;"></div>
+
 
   <div class="row" style="margin-top: 30px;">
     <div class="col s12 right-align">
@@ -77,10 +93,11 @@
 
   <script>
     // Esta es la línea 3 referenciada en el error si el script de Materialize JS no se carga antes.
+
     document.addEventListener('DOMContentLoaded', function() {
       M.AutoInit(); // Inicializar componentes de Materialize
       document.getElementById('btnSubirEvidencias').addEventListener('click', iniciarSubida);
-      
+
       document.getElementById('asistenciaFile').addEventListener('change', function(e) {
         handleFileSelection(e.target, document.getElementById('asistenciaFileSummary'));
       });
@@ -90,7 +107,100 @@
       document.getElementById('fotosFiles').addEventListener('change', function(e) {
         handleFileSelection(e.target, document.getElementById('fotosFilesSummary'), true);
       });
+
+      // Mostrar loader antes de buscar evidencias
+      mostrarLoaderEvidencias(true);
+      google.script.run.withSuccessHandler(function(evidencias) {
+        mostrarLoaderEvidencias(false);
+        mostrarEvidenciasActualesEnUI(evidencias);
+      }).obtenerEvidenciasActuales();
     });
+    // Renderiza la lista de evidencias actuales en el contenedor
+    function mostrarEvidenciasActualesEnUI(evidencias) {
+      mostrarLoaderEvidencias(false);
+      // Filtrar solo las evidencias activas (no eliminadas)
+      var evidenciasActivas = (evidencias || []).filter(function(ev) { return !ev.estado || ev.estado !== 'eliminada'; });
+      console.log("Evidencias actuales:", evidenciasActivas);
+      var cont = document.getElementById('evidenciasActualesContainer');
+      if (!evidenciasActivas || evidenciasActivas.length === 0) {
+        cont.innerHTML = '<div class="card-panel yellow lighten-4">No hay evidencias registradas para esta visita.</div>';
+        habilitarInputsEvidencia();
+        return;
+      }
+      var html = '<h6><i class="material-icons left">folder</i>Evidencias registradas</h6>';
+      html += '<ul class="collection">';
+      evidenciasActivas.forEach(function(ev, idx) {
+        html += `<li class="collection-item" id="evidencia-item-${idx}">`;
+        html += `<b>${ev.tipo || 'Evidencia'}</b>: ${ev.nombreOriginal || ''}`;
+        if (ev.url) html += ` <a href="${ev.url}" target="_blank">(Ver)</a>`;
+        html += `<br><span style="font-size:0.9em;color:#888;">${ev.mimeType || ''}</span>`;
+        html += `<span style="float:right;"><a href="#" onclick="eliminarEvidencia('${ev.tipo}', this);return false;" class="red-text"><i class="material-icons" style="font-size:18px;vertical-align:top;">delete</i></a></span>`;
+        html += '</li>';
+      });
+      html += '</ul>';
+      cont.innerHTML = html;
+      deshabilitarInputsEvidencia(evidenciasActivas);
+    }
+    // Habilita todos los inputs de evidencia
+    function habilitarInputsEvidencia() {
+      setInputEvidenciaEnabled('asistenciaFile', true);
+      setInputEvidenciaEnabled('transporteFile', true);
+      setInputEvidenciaEnabled('fotosFiles', true);
+    }
+
+    // Deshabilita los inputs según las evidencias activas
+    function deshabilitarInputsEvidencia(evidenciasActivas) {
+      var tipos = evidenciasActivas.map(function(ev) { return ev.tipo || ev.tipoEvidencia; });
+      setInputEvidenciaEnabled('asistenciaFile', !tipos.includes('Lista_Asistencia'));
+      setInputEvidenciaEnabled('transporteFile', !tipos.includes('Soporte_Transporte'));
+      var hayFoto = tipos.some(function(t) { return t && t.startsWith('Foto_Evidencia_'); });
+      setInputEvidenciaEnabled('fotosFiles', !hayFoto);
+    }
+
+    // Habilita o deshabilita el input y la clase del botón padre para Materialize
+    function setInputEvidenciaEnabled(inputId, enabled) {
+      var input = document.getElementById(inputId);
+      if (!input) return;
+      input.disabled = !enabled;
+      var btn = input.closest('.btn');
+      if (btn) {
+        if (enabled) {
+          btn.classList.remove('disabled');
+        } else {
+          btn.classList.add('disabled');
+        }
+      }
+    }
+
+    // Elimina una evidencia por tipo y actualiza el listado
+    function eliminarEvidencia(tipoEvidencia, btn) {
+      // Loader pequeño a nivel de fila
+      if (btn) {
+        var li = btn.closest('li.collection-item');
+        if (li) {
+          li.innerHTML = '<div class="progress" style="height:4px;"><div class="indeterminate"></div></div><span style="font-size:0.9em;color:#888;">Eliminando...</span>';
+        }
+      } else {
+        mostrarLoaderEvidencias(true);
+      }
+      google.script.run.withSuccessHandler(function(evidencias) {
+        mostrarLoaderEvidencias(false);
+        mostrarEvidenciasActualesEnUI(evidencias);
+        // Actualizar las URLs en la celda de evidencias si existe función para ello
+        if (typeof actualizarCeldaEvidencias === 'function') {
+          actualizarCeldaEvidencias(evidencias);
+        }
+      })
+        .guardarEvidenciasActualizadasPorEliminacion(tipoEvidencia);
+    }
+
+    // Loader para evidencias
+    function mostrarLoaderEvidencias(mostrar) {
+      var cont = document.getElementById('evidenciasActualesContainer');
+      if (mostrar) {
+        cont.innerHTML = '<div class="progress"><div class="indeterminate"></div></div><div style="text-align:center;margin-top:10px;">Buscando evidencias...</div>';
+      }
+    }
 
     function handleFileSelection(fileInput, summaryElement, isMultiple) {
         if (fileInput.files.length > 0) {
@@ -194,13 +304,13 @@
         if (response.filesUploaded && response.filesUploaded.length > 0) {
             message += "Archivos procesados: <ul style='margin-left: 20px; font-size:0.9em;'>";
             response.filesUploaded.forEach(f => {
-                message += `<li>${f.tipoEvidencia || 'Archivo'}: ${f.originalName} (${f.driveUrl ? `<a href="${f.driveUrl}" target="_blank">Ver</a>` : 'ID: '+f.driveId})</li>`;
+                message += `<li>${f.tipoEvidencia || 'Archivo'}: ${f.originalName} (${f.driveUrl ? `<a href=\"${f.driveUrl}\" target=\"_blank\">Ver</a>` : 'ID: '+f.driveId})</li>`;
             });
             message += "</ul>";
         }
         document.getElementById('uploadStatus').innerHTML = `<p class="green-text text-darken-1">${message}</p>`;
         M.toast({html: '¡Carga completada!', classes: 'green darken-1', displayLength: 5000});
-        
+
         document.getElementById('asistenciaFile').value = null;
         document.querySelector('#asistenciaFile ~ .file-path-wrapper input').value = "";
         document.getElementById('asistenciaFileSummary').textContent = "";
@@ -210,6 +320,9 @@
         document.getElementById('fotosFiles').value = null;
         document.querySelector('#fotosFiles ~ .file-path-wrapper input').value = "";
         document.getElementById('fotosFilesSummary').textContent = "";
+
+        // Volver a cargar la lista de evidencias actuales
+        google.script.run.withSuccessHandler(mostrarEvidenciasActualesEnUI).obtenerEvidenciasActuales();
 
       } else {
         var errorMessage = (response && response.message) || "Ocurrió un error desconocido durante la subida.";

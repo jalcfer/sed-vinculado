@@ -92,21 +92,7 @@ function onEdit(e: GoogleAppsScript.Events.SheetsOnEdit): void {
   const template = getJornadaSheetTemplate();
   const validationService = getSheetValidationService();
   
-  if (!validationService.isCellEditable(range.getA1Notation())) {
-    // La celda NO es editable.
-    const notificationService = getNotificationService();
-    
-    // Mostramos el mensaje de inmediato para que el usuario sepa qué pasó.
-    notificationService.showToast('Esta celda no se puede modificar.', 'Acción no permitida', 3);
-
-    // --- LÓGICA DE REVERSIÓN ROBUSTA ---
-    // Si e.oldValue existe (la celda tenía contenido), lo restauramos.
-    if (e.oldValue !== undefined) {
-      range.setValue(e.oldValue);
-    } else {
-      // Si e.oldValue es undefined, significa que la celda estaba vacía antes.
-      // En este caso, la acción correcta es borrar el nuevo contenido que el usuario introdujo.
-      range.clearContent();
-    }
+  if (!validationService.isPrincipalCell(range.getA1Notation(), template)) {
+    PropertiesService.getScriptProperties().setProperty(appConfig.properties.JORNADA_IS_DIRTY_KEY, 'true');
   }
 }

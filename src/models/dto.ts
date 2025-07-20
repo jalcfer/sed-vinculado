@@ -52,3 +52,19 @@ interface LogrosDificultadesAcuerdosDTO {
     acuerdos: string[];
   };
 }
+
+interface EvidenciaUploadDTO {
+  name: string;
+  mimeType: string;
+  data: string; // Base64
+  tipoEvidencia: string;
+}
+
+interface EvidenciaDisplayDTO {
+  tipo: string;
+  nombreOriginal: string;
+  url: string;
+  mimeType: string;
+  estado: 'activa' | 'eliminada';
+  driveFileId?: string;
+}

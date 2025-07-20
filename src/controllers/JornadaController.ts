@@ -48,11 +48,10 @@ function iniciarJornada_() {
 
       // 4. Agregar y formatear filas para participantes si es necesario
       if (numParticipantes > 0) {
-        const spreadsheetId = spreadsheet.getId();
         const startRow = appConfig.sheets.jornada.startRow; // Fila de inicio para la lista de participantes, después de los encabezados
         const roles = getDataViewRepository().getListData('Rol_Institucional', 'Nombre_rol_institucional', 'Activo_rol_institucional');
 
-        getJornadaSheetService().agregarFilasParticipantes(spreadsheetId, startRow, numParticipantes, roles);
+        getJornadaSheetService().agregarFilasParticipantes(startRow, numParticipantes, roles);
       }
 
       reportProgress(`Participantes agregados: ${numParticipantes}`);
@@ -73,6 +72,10 @@ function iniciarJornada_() {
     const error = e as Error;
     Logger.log(`Error en iniciarJornada_: ${error.message}\n${error.stack}`);
     ui.alert('Error', `No se pudo iniciar la jornada: ${error.message}`, ui.ButtonSet.OK);
+  } finally {
+    // --- ¡EL PASO MÁS IMPORTANTE PARA ACTUALIZAR EL MENÚ! ---
+    // Se ejecuta siempre, asegurando que el menú refleje el nuevo estado.
+    buildDynamicMenu({} as GoogleAppsScript.Events.DocsOnOpen);
   }
 }
 
@@ -142,6 +145,9 @@ function getExistingLDAData_Modal(): LogrosDificultadesAcuerdosDTO | null {
 function guardarLogrosDificultadesAcuerdos(datosParaGuardar: LogrosDificultadesAcuerdosDTO): { success: boolean; message: string } {
   try {
     getJornadaService().saveLDAToProperties(datosParaGuardar);
+    // 2. Pedirle al servicio de la hoja que formatee y escriba los datos.
+    getJornadaSheetService().actualizarCeldasLDA(datosParaGuardar);
+
     return { success: true, message: "Datos guardados temporalmente." };
   } catch (e: any) {
     Logger.log(`Error en guardarLogrosDificultadesAcuerdos: ${e.message}`);

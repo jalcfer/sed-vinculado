@@ -12,15 +12,13 @@
 class MenuService {
   private ui: GoogleAppsScript.Base.Ui;
   private userRole: 'ADMIN' | 'OWNER' | 'PA' | 'UNDEFINED';
-  private appState: { [key: string]: string };
+  private appState: { [key: string]: string } | null = null;
   static instance: MenuService;
 
   constructor() {
     this.ui = SpreadsheetApp.getUi();
     this.userRole = this.getCurrentUserRole();
-    this.appState = this.getApplicationState();
     Logger.log(`Rol del usuario: ${this.userRole}`);
-    Logger.log(`Estado de la aplicación: ${JSON.stringify(this.appState)}`);
   }
 
   public static getInstance(): MenuService {
@@ -31,13 +29,34 @@ class MenuService {
   }
 
   /**
+   * [NUEVO MÉTODO] Refresca el estado de la aplicación leyendo desde PropertiesService.
+   * Este método DEBE ser llamado antes de cualquier operación que dependa del estado.
+   */
+  public refreshApplicationState(): void {
+    const props = PropertiesService.getScriptProperties();
+    
+    const status = props.getProperty(appConfig.properties.JORNADA_STATUS_KEY) || 'No Iniciada';
+    const numero = props.getProperty(appConfig.properties.JORNADA_NUMERO_KEY) || 'N/A'; // Asegúrate de que JORNADA_NUMERO_KEY exista en appConfig
+    const isDirty = props.getProperty(appConfig.properties.JORNADA_IS_DIRTY_KEY) === 'true';
+    
+    this.appState = {
+      jornadaStatus: status,
+      numeroJornada: numero, // Usamos la clave que definimos en menuConfig
+      isDirty: String(isDirty),
+      dirtyMark: isDirty ? ' ❌ ' : '' // Pre-calculamos la marca sucia
+    };
+    Logger.log(`Estado de la aplicación refrescado: ${JSON.stringify(this.appState)}`);
+  }
+
+  /**
    * Crea y muestra el menú principal de la aplicación basado en la configuración y el rol del usuario.
    */
   public createDynamicMenu(): void {
+    this.refreshApplicationState();
     const topMenuConfig = menuConfig[0];
     const menu = this.ui.createMenu(topMenuConfig.label);
 
-    if (topMenuConfig.subItems) {
+    if (topMenuConfig.subItems && this.appState) {
       this.buildMenu(menu, topMenuConfig.subItems, this.userRole, this.appState);
     }
 
@@ -55,7 +74,7 @@ class MenuService {
     parentMenu: GoogleAppsScript.Base.Menu,
     items: MenuItem[],
     userRole: string,
-    appState: { [key: string]: string }
+    appState: { [key: string]: string } | null
   ): void {
     Logger.log(`Construyendo menú para el rol: ${userRole} con estado: ${JSON.stringify(appState)}`);
     Logger.log(`Elementos del menú: ${JSON.stringify(items)}`);
@@ -65,17 +84,37 @@ class MenuService {
       }
 
       let finalLabel = item.icon ? `${item.icon} ${item.label}` : item.label;
-      if (item.labelStates) {
+      if (item.labelStates && appState) {
+        // Lógica existente para estados simples
         const currentState = appState[item.labelStates.stateKey];
         if (currentState && item.labelStates.states[currentState]) {
           finalLabel = item.icon ? `${item.icon} ${item.labelStates.states[currentState]}` : item.labelStates.states[currentState];
         }
+      } else if (item.dynamicLabel && appState) {
+        // ¡NUEVA LÓGICA para etiquetas complejas!
+        let tempLabel = item.dynamicLabel.template;
+        // Reemplazar cada placeholder con el valor del estado
+        for (const placeholder in item.dynamicLabel.keys) {
+          const stateKey = item.dynamicLabel.keys[placeholder];
+          const value = appState[stateKey] || '';
+          tempLabel = tempLabel.replace(`{${placeholder}}`, value);
+        }
+        finalLabel = tempLabel;
       }
 
       if (item.subItems) {
+      // 3. ANTES de crear el submenú, verificar si tendrá contenido.
+      const visibleSubItems = item.subItems.filter(subItem => 
+        subItem.roles.includes(userRole as any)
+      );
+
+      // 4. SOLO si hay sub-ítems visibles para este rol, crear y poblar el submenú.
+      if (visibleSubItems.length > 0) {
         const subMenu = this.ui.createMenu(finalLabel);
-        this.buildMenu(subMenu, item.subItems, userRole, appState);
+        // Llamar a la recursión solo con los ítems visibles.
+        this.buildMenu(subMenu, visibleSubItems, userRole, appState);
         parentMenu.addSubMenu(subMenu);
+      }
       } else if (item.isSeparator) {
         parentMenu.addSeparator();
       } else if (item.functionName) {

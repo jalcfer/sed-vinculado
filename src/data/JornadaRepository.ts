@@ -192,6 +192,8 @@ class JornadaRepository {
       Objetivo_visita: '',
       DuracionHoras: 0,
       Numero_participantes: data.Numero_participantes,
+      Fecha_creacion: new Date().toISOString(),
+      Fecha_actualizacion: new Date().toISOString(),
     };
     const newVisitaId = this.db.insertInto('Visita', visitaRecord);
     Logger.log(`Visita inicial creada con ID: ${newVisitaId}`);
@@ -241,6 +243,9 @@ class JornadaRepository {
       Estado: 'Finalizada',
       Objetivo_visita: jornadaData.objetivo,
       DuracionHoras: jornadaData.duracion,
+      Numero_participantes: jornadaData.numeroParticipantes,
+      Fecha_creacion: new Date().toISOString(),
+      Fecha_actualizacion: new Date().toISOString(),
     };
     const newVisitaId = this.db.insertInto('Visita', visitaRecord);
     Logger.log(`Visita creada con ID: ${newVisitaId}`);
@@ -433,6 +438,18 @@ class JornadaRepository {
     }
   }
 
+  /**
+   * Obtiene el ID de la carpeta de evidencias para una visita específica.
+   * @param idVisita El ID de la visita.
+   * @returns El ID de la carpeta de evidencias o null si no se encuentra.
+   */
+  public getFolderEvidenciasId(idVisita: number): string | null {
+    const result = this.db.selectFrom('Archivo_Jornada', ['ID_folder_evidencias'])
+      .where('ID_Visita', '=', idVisita)
+      .execute();
+    
+    return result.length > 0 ? result[0].ID_folder_evidencias : null;
+  }  
   
 }
 

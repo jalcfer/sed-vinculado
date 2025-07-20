@@ -19,6 +19,21 @@ class JornadaSheetService {
   }
 
   /**
+   * [HELPER PRIVADO] Obtiene la hoja de jornada activa.
+   * Centraliza la lógica de obtención y validación de la hoja.
+   * @returns El objeto Sheet de la jornada activa.
+   * @throws Error si la hoja activa no es la hoja de Jornada.
+   */
+  private getActiveJornadaSheet(): GoogleAppsScript.Spreadsheet.Sheet {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    // Añadimos una validación para asegurar que estamos en la hoja correcta.
+    if (sheet.getName() !== appConfig.sheets.jornada.name) {
+      throw new Error(`Operación inválida: debe estar en la hoja "${appConfig.sheets.jornada.name}".`);
+    }
+    return sheet;
+  }
+
+  /**
    * Prepara una hoja de cálculo específica para ser una hoja de Jornada.
    * Elimina todas las hojas excepto la primera y la renombra a "Jornada".
    * @param spreadsheetId El ID de la hoja de cálculo a preparar.
@@ -91,13 +106,12 @@ class JornadaSheetService {
   /**
    * Agrega un número específico de filas para participantes en la hoja de Jornada,
    * aplicando formato y validaciones de datos.
-   * @param spreadsheetId El ID de la hoja de cálculo.
    * @param startRow La fila donde comenzará la inserción de participantes.
    * @param numParticipantes El número de filas de participantes a agregar.
    * @param roles La lista de roles institucionales para la validación de datos.
    */
-  public agregarFilasParticipantes(spreadsheetId: string, startRow: number, numParticipantes: number, roles: string[]): void {
-    const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(appConfig.sheets.jornada.name);
+  public agregarFilasParticipantes(startRow: number, numParticipantes: number, roles: string[]): void {
+    const sheet = this.getActiveJornadaSheet();
     if (!sheet) {
       throw new Error(`No se encontró la hoja "${appConfig.sheets.jornada.name}". Asegúrese de estar en el archivo correcto`);
     }
@@ -149,6 +163,132 @@ class JornadaSheetService {
     });
 
     Logger.log(`${numParticipantes} filas de participantes agregadas y formateadas correctamente.`);
+  }
+
+  /**
+   * Actualiza la celda de evidencias en la hoja con una lista de enlaces.
+   * @param evidenciasActivas Un array de DTOs de las evidencias activas.
+   */
+  public actualizarCeldaEvidencias(evidenciasActivas: EvidenciaDisplayDTO[]): void {
+    //const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(appConfig.sheets.jornada.name);
+    const sheet = this.getActiveJornadaSheet();
+    if (!sheet) return;
+
+    const rangeA1 = appConfig.sheets.jornada.fields.evidencias.initRange;
+    const evidenceCell = sheet.getRange(rangeA1);
+
+    if (!evidenciasActivas || evidenciasActivas.length === 0) {
+      evidenceCell.setValue("No hay evidencias cargadas.");
+      return;
+    }
+
+    const richTextBuilder = SpreadsheetApp.newRichTextValue();
+    const fullText = evidenciasActivas
+      .map(ev => `${ev.tipo} (${ev.nombreOriginal})`)
+      .join('\n');
+    
+    richTextBuilder.setText(fullText);
+
+    let currentIndex = 0;
+    evidenciasActivas.forEach(ev => {
+      const linkText = `${ev.tipo} (${ev.nombreOriginal})`;
+      if (ev.url) {
+        richTextBuilder.setLinkUrl(currentIndex, currentIndex + linkText.length, ev.url);
+      }
+      currentIndex += linkText.length + 1; // +1 por el salto de línea
+    });
+
+    evidenceCell.setRichTextValue(richTextBuilder.build());
+    evidenceCell.setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
+  }
+
+  /**
+   * Orquesta la actualización de las celdas de Logros, Dificultades y Acuerdos
+   * basándose en los datos del DTO.
+   * @param ldaData El objeto DTO con los datos a formatear.
+   */
+  public actualizarCeldasLDA(ldaData: LogrosDificultadesAcuerdosDTO): void {
+    const sheet = this.getActiveJornadaSheet();
+    if (!sheet) return;
+
+    // Limpiar el contenido previo de las celdas
+    sheet.getRange(appConfig.sheets.jornada.fields.logros.initRange).clearContent();
+    sheet.getRange(appConfig.sheets.jornada.fields.dificultades.initRange).clearContent();
+    sheet.getRange(appConfig.sheets.jornada.fields.acuerdos.initRange).clearContent();
+
+    // Formatear y escribir cada sección
+    const logrosRichText = this.buildRichTextForLDA(ldaData, 'logros');
+    if (logrosRichText) {
+      sheet.getRange(appConfig.sheets.jornada.fields.logros.initRange).setRichTextValue(logrosRichText);
+    }
+
+    const dificultadesRichText = this.buildRichTextForLDA(ldaData, 'dificultades');
+    if (dificultadesRichText) {
+      sheet.getRange(appConfig.sheets.jornada.fields.dificultades.initRange).setRichTextValue(dificultadesRichText);
+    }
+
+    const acuerdosRichText = this.buildRichTextForLDA(ldaData, 'acuerdos');
+    if (acuerdosRichText) {
+      sheet.getRange(appConfig.sheets.jornada.fields.acuerdos.initRange).setRichTextValue(acuerdosRichText);
+    }
+  }
+
+  /**
+   * [HELPER PRIVADO] Construye un valor de RichText formateado para una categoría específica (logros, etc.).
+   * @param ldaData El objeto DTO completo.
+   * @param category La clave de la categoría a procesar ('logros', 'dificultades', 'acuerdos').
+   * @returns Un objeto RichTextValue construido, o null si no hay datos para esa categoría.
+   */
+  private buildRichTextForLDA(ldaData: LogrosDificultadesAcuerdosDTO, category: 'logros' | 'dificultades' | 'acuerdos'): GoogleAppsScript.Spreadsheet.RichTextValue | null {
+    const boldStyle = SpreadsheetApp.newTextStyle().setBold(true).build();
+    const titleGeneralStyle = SpreadsheetApp.newTextStyle().setBold(true).setFontSize(11).build();
+
+    let fullText = "";
+    const textStyleRuns: { start: number; end: number; style: GoogleAppsScript.Spreadsheet.TextStyle; }[] = [];
+    
+    // Verificar si hay datos en la categoría solicitada
+    const hayDatos = Object.values(ldaData).some(linea => linea[category] && linea[category].length > 0);
+    if (!hayDatos) {
+      return null; // No hay nada que construir
+    }
+    
+    // 1. Título General (si hay datos)
+    const tituloGeneral = "Líneas de Trabajo\n\n";
+    fullText += tituloGeneral;
+    textStyleRuns.push({ start: 0, end: tituloGeneral.trim().length, style: titleGeneralStyle });
+
+    let lineaIndex = 0;
+    let primeraLineaConItems = true;
+    for (const lineaNombre in ldaData) {
+      const items = ldaData[lineaNombre][category];
+      if (items && items.length > 0) {
+        if (!primeraLineaConItems) {
+          fullText += "\n\n"; // Separador
+        }
+
+        const titleStart = fullText.length;
+        // 2. Título de la Línea de Trabajo con numeración
+        const lineaTitulo = `${lineaIndex + 1}. ${lineaNombre}`;
+        fullText += lineaTitulo;
+        textStyleRuns.push({ start: titleStart, end: fullText.length, style: boldStyle });
+
+        // 3. Viñetas para cada ítem
+        items.forEach(item => {
+          fullText += `\n• ${item}`;
+        });
+        
+        primeraLineaConItems = false;
+        lineaIndex++;
+      }
+    }
+    
+    // Construir el objeto RichText
+    const richTextBuilder = SpreadsheetApp.newRichTextValue().setText(fullText);
+    textStyleRuns.forEach(run => {
+      richTextBuilder.setTextStyle(run.start, run.end, run.style);
+    });
+
+    return richTextBuilder.build();
   }
 }
 

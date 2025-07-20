@@ -123,25 +123,40 @@
       <div class="row">
         <div class="input-field col s12 m4"><select id="tipoIdentificacion" required>
             <option value="" disabled selected>Seleccione...</option>
-          </select><label>Tipo ID*</label></div>
-        <div class="input-field col s12 m5"><input id="numeroIdentificacion" type="text" class="validate"
-            required><label for="numeroIdentificacion">Número ID*</label></div>
+          </select><label>Tipo ID*</label>
+        </div>
+        <!-- Para campos numéricos como la identificación -->
+        <div class="input-field col s12 m5">
+          <input id="numeroIdentificacion" type="text" class="validate" required pattern="[0-9]+"
+            title="Este campo solo admite números.">
+          <label for="numeroIdentificacion">Número ID*</label>
+        </div>
         <div class="input-field col s12 m3"><button type="button" id="btnBuscarDocente"
             class="btn waves-effect waves-light" style="margin-top: 15px;" onclick="buscarDocente()">Buscar</button>
         </div>
       </div>
       <div id="docenteInfo" class="row hidden"></div>
       <div class="row">
-        <div class="input-field col s12 m6"><input id="nombreDocente" type="text" class="validate" required><label
-            for="nombreDocente">Nombres*</label></div>
-        <div class="input-field col s12 m6"><input id="apellidoDocente" type="text" class="validate" required><label
-            for="apellidoDocente">Apellidos*</label></div>
+        <!-- Para campos de texto (nombres, apellidos) que no deben tener números -->
+        <div class="input-field col s12 m6">
+          <input id="nombreDocente" type="text" class="validate" required pattern="[a-zA-ZñÑáéíóúÁÉÍÓÚ\s]+"
+            title="Este campo solo admite letras y espacios.">
+          <label for="nombreDocente">Nombres*</label>
+        </div>
+        <div class="input-field col s12 m6">
+          <input id="apellidoDocente" type="text" class="validate" required pattern="[a-zA-ZñÑáéíóúÁÉÍÓÚ\s]+"
+            title="Este campo solo admite letras y espacios.">
+          <label for="apellidoDocente">Apellidos*</label>
+        </div>
       </div>
       <div class="row">
         <div class="input-field col s12 m6"><input id="correoDocente" type="email" class="validate"><label
             for="correoDocente">Correo Electrónico</label></div>
-        <div class="input-field col s12 m6"><input id="celularDocente" type="text"><label for="celularDocente">Número
-            Celular</label></div>
+        <!-- Para el celular, que debe ser numérico -->
+        <div class="input-field col s12 m6">
+          <input id="celularDocente" type="text" pattern="[0-9]+" title="Este campo solo admite números.">
+          <label for="celularDocente">Número Celular</label>
+        </div>
       </div>
 
       <h5 class="section-title">Títulos Académicos</h5>
@@ -423,15 +438,39 @@
       const saveButton = form.querySelector('button[type="submit"]');
       saveButton.disabled = true;
 
+      // Validación de Títulos (asegurarse de que no envíen filas vacías si las agregan y luego borran el texto)
+      const titulosInputs = Array.from(document.querySelectorAll('#titulosContainer .dynamic-row'));
+      for (const row of titulosInputs) {
+        const tipo = row.querySelector('.tipo-titulo').value.trim();
+        const titulo = row.querySelector('.titulo-docente').value.trim();
+        if ((tipo && !titulo) || (!tipo && titulo)) {
+          M.toast({ html: 'En la sección de Títulos, debe completar tanto el Tipo como el Título Obtenido para cada fila.', classes: 'orange' });
+          return;
+        }
+      }
+
       const titulos = Array.from(document.querySelectorAll('#titulosContainer .dynamic-row')).map(row => ({
         id: row.dataset.tituloId ? parseInt(row.dataset.tituloId, 10) : undefined,
         tipo_titulo_docente: row.querySelector('.tipo-titulo').value.trim(),
         titulo_docente: row.querySelector('.titulo-docente').value.trim()
       })).filter(t => t.tipo_titulo_docente && t.titulo_docente);
 
+      const areaPrincipalId = parseInt(document.getElementById('areaPrincipal').value, 10);
       const areasAuxiliares = Array.from(document.querySelectorAll('#areasAuxiliaresContainer .area-auxiliar'))
         .map(select => parseInt(select.value, 10))
         .filter(id => !isNaN(id));
+
+      // Validación de Áreas Auxiliares
+      if (areasAuxiliares.includes(areaPrincipalId)) {
+        M.toast({ html: 'El Área Principal no puede ser seleccionada también como un Área Auxiliar.', classes: 'orange' });
+        return; // Detener el envío
+      }
+
+      const uniqueAreasAuxiliares = new Set(areasAuxiliares);
+      if (uniqueAreasAuxiliares.size !== areasAuxiliares.length) {
+        M.toast({ html: 'No puede seleccionar la misma Área Auxiliar más de una vez.', classes: 'orange' });
+        return; // Detener el envío
+      }
 
       const grados = Array.from(document.querySelectorAll('input[name="grados"]:checked'))
         .map(cb => parseInt(cb.value, 10));

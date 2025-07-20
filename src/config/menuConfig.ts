@@ -18,6 +18,16 @@ interface MenuItem {
     stateKey: string; // La clave de estado a consultar.
     states: { [key: string]: string }; // Mapeo de valores de estado a textos de label.
   };
+  /**
+   * Define una plantilla para construir una etiqueta dinámica.
+   * La plantilla usará {key} para interpolar valores del estado.
+   */
+  dynamicLabel?: {
+    template: string; // ej. "Jornada {numero} - {status}{dirtyMark}"
+    // Las claves aquí son las que se usarán en la plantilla.
+    // Los valores son las claves a buscar en appState.
+    keys: { [placeholder: string]: string }; 
+  };
 }
 
 /**
@@ -30,6 +40,26 @@ const menuConfig: MenuItem[] = [
     label: 'Gestión Acompañamiento',
     roles: ['ADMIN', 'OWNER', 'PA'], // Rol padre que engloba a los demás
     subItems: [
+      {
+        label: 'Estado de la Jornada', // Un label base por si algo falla
+        functionName: 'dummyFunction', // No hace nada al hacer clic
+        roles: ['ADMIN', 'OWNER', 'PA'],
+        dynamicLabel: {
+          // La plantilla de cómo se debe ver el título.
+          template: 'Jornada {numero} - {status}{dirtyMark}',
+          // Mapeo de los placeholders en la plantilla a las claves del appState.
+          keys: {
+            numero: 'numeroJornada',
+            status: 'jornadaStatus',
+            dirtyMark: 'dirtyMark'
+          }
+        }
+      },
+      {
+        isSeparator: true, // Separador para separar el título del resto.
+        roles: ['ADMIN', 'OWNER', 'PA'],
+        label: 'separator_title',
+      },
       {
         label: 'Admin',
         icon: '⚙️',
@@ -66,25 +96,25 @@ const menuConfig: MenuItem[] = [
       {
         label: 'Informes',
         icon: '🧑‍🏫',
-        roles: ['PA'],
+        roles: ['OWNER'],
         subItems: [
           {
             label: 'Actualizar Jornadas',
             icon: '🔄',
-            functionName: 'actualizarJornadasPA', // Placeholder
-            roles: ['PA'],
+            functionName: 'actualizarJornadasPA',
+            roles: ['OWNER'],
           },
           {
             label: 'Generar Informe Preliminar',
             icon: '📝',
             functionName: 'generarInformePreliminar_',
-            roles: ['PA'],
+            roles: ['OWNER'],
           },
           {
             label: 'Reportar Informe Bimensual',
             icon: '📊',
             functionName: 'showInformeDialog',
-            roles: ['PA'],
+            roles: ['OWNER'],
           }
 
 
@@ -103,7 +133,7 @@ const menuConfig: MenuItem[] = [
             labelStates: {
               stateKey: appConfig.properties.JORNADA_STATUS_KEY,
               states: {
-                INICIADA: 'Registrar Jornada (en curso...)',
+                'EN CURSO': 'Registrar Jornada',
               },
             },
           },
@@ -127,8 +157,8 @@ const menuConfig: MenuItem[] = [
             labelStates: {
               stateKey: appConfig.properties.JORNADA_STATUS_KEY,
               states: {
-                NO_INICIADA: 'Finalizar y Guardar Jornada (No iniciada)',
-                FINALIZADA: 'Finalizar y Guardar Jornada (Finalizada)',
+                INICIADA: 'Finalizar y Guardar Jornada',
+                FINALIZADA: 'Finalizar y Guardar Jornada',
               },
             },
           },

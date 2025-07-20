@@ -257,6 +257,8 @@ interface Visita {
     Objetivo_visita: string;
     DuracionHoras: number;
     Numero_participantes?: number;
+    Fecha_creacion: string; // ISO string
+    Fecha_actualizacion: string; // ISO string
 }
 
 /**
@@ -349,6 +351,23 @@ interface Usuario {
     Activo_usuario: boolean;
     /** Permisos adicionales (opcional) */
     Permisos?: string;
+}
+
+/**
+ * Representa la tabla Evidencia para el registro de archivos copia de jornadas.
+ */
+interface Evidencia {
+  ID_Registro_evidencia: number,
+  ID_visita: number,
+  Tipo_evidencia: string,
+  Nombre_archivo_original: string,
+  ID_archivo_drive: string,
+  Fecha_carga: string,
+  MIMEtype: string,
+  Url: string,
+  Estado_evidencia: 'activa' | 'eliminada',
+  Fecha_creacion:string,
+  Fecha_actuallizacion: string
 }
 
 /**

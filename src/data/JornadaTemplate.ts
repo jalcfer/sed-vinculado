@@ -33,6 +33,8 @@ type JornadaSheetTemplate = {
     };
     protected?: boolean;
     fontWeight?: 'normal' | 'bold';
+    isPrincipal?: boolean; // Indica si es un campo principal de la jornada
+    required?: boolean; // Indica si es un campo obligatorio
   }[];
   protections: { range: string; description: string }[];
   fontFamily?: string;
@@ -72,15 +74,15 @@ function getJornadaSheetTemplate(): JornadaSheetTemplate {
     fields: [
       { range: 'A1:U5', label: 'FORTALECER LOS PROCESOS DE INNOVACIÓN PEDAGÓGICA Y CURRICULAR QUE CONTRIBUYAN AL DESARROLLO DE APRENDIZAJES\nINFORME JORNADA DE ACOMPAÑAMIENTO  ', editable: false, align: 'center', verticalAlign: 'middle', protected: true, fontWeight: 'bold' },
       { range: 'B7:H7', label: 'FECHA JORNADA:', editable: false, align: 'left', protected: true, fontWeight: 'bold' },
-      { range: 'I7:N7', label: '', editable: false, type: 'date', border: { type: 'bottom' }, align: 'left', protected: true },
+      { range: 'I7:N7', label: '', editable: false, type: 'date', border: { type: 'bottom' }, align: 'left', protected: true, isPrincipal: true, required: true },
       { range: 'B8:H8', label: 'JORNADA DE ACOMPAÑAMIENTO No.', editable: false, align: 'left', protected: true, fontWeight: 'bold' },
-      { range: 'I8', label: '', editable: false, type: 'number', border: { type: 'bottom' }, align: 'left', protected: true },
+      { range: 'I8', label: '', editable: false, type: 'number', border: { type: 'bottom' }, align: 'left', protected: true, isPrincipal: true, required: true },
       { range: 'J8:K8', label: 'DURACIÓN (Horas)', editable: false, align: 'center', protected: true, fontWeight: 'bold' },
       { range: 'L8:N8', label: '', editable: true, type: 'number', border: { type: 'bottom' }, align: 'left' },
       { range: 'B9:H9', label: 'TIPO DE JORNADA', editable: false, align: 'left', protected: true, fontWeight: 'bold' },
       { range: 'I9:N9', label: '', editable: true, type: 'dropdown', options: ['Socialización', 'Linea Trabajo', 'Gestión'], border: { type: 'bottom' }, align: 'left' },
       { range: 'B10:H10', label: 'INST EDUCATIVA (IEO)', editable: false, align: 'left', protected: true, fontWeight: 'bold' },
-      { range: 'I10:R10', label: '', editable: false, border: { type: 'bottom' }, align: 'left', protected: true },
+      { range: 'I10:R10', label: '', editable: false, border: { type: 'bottom' }, align: 'left', protected: true, isPrincipal: true, required: true },
       { range: 'B11:H11', label: 'LÍNEA DE TRABAJO:', editable: false, align: 'left', protected: true, fontWeight: 'bold' },
       { range: 'I11:R11', label: '', editable: true, type: 'dropdown', dataSource: { table: 'Linea_Trabajo', valueColumn: 'Nombre_linea_trabajo', activeColumn: 'Activo_linea_trabajo' }, border: { type: 'bottom' }, align: 'left' },
       { range: 'B12:H12', label: 'ÁREA:', editable: false, align: 'left', protected: true, fontWeight: 'bold' },
@@ -91,7 +93,7 @@ function getJornadaSheetTemplate(): JornadaSheetTemplate {
       { range: 'A19:A20', label: 'ROL', editable: false, align: 'center', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
       { range: 'B19:J20', label: 'NOMBRE COMPLETO', editable: false, align: 'center', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
       { range: 'K19:K20', label: 'TOTAL\nPARTICIPANTES', editable: false, align: 'center', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
-      { range: 'L18:N20', label: 'ARE\nDOCENTE', editable: false, align: 'center', verticalAlign: 'middle', rotation: 90, border: { type: 'full' }, protected: true, fontWeight: 'bold' },
+      { range: 'L18:N20', label: 'ARE\nDOCENTE', editable: false, align: 'center', verticalAlign: 'middle', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
       { range: 'O18:O20', label: 'GRADOS', editable: false, align: 'center', verticalAlign: 'middle', rotation: 90, border: { type: 'full' }, protected: true, fontWeight: 'bold' },
       { range: 'P18:P20', label: 'HORAS', editable: false, align: 'center', verticalAlign: 'middle', rotation: 90, border: { type: 'full' }, protected: true, fontWeight: 'bold' },
       { range: 'Q18', label: 'LOGROS', editable: false, align: 'center', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
@@ -99,11 +101,11 @@ function getJornadaSheetTemplate(): JornadaSheetTemplate {
       { range: 'S18', label: 'ACUERDOS Y COMPROMISOS', editable: false, align: 'center', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
       { range: 'T18', label: 'EVIDENCIAS', editable: false, align: 'center', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
       { range: 'U18', label: 'OBSERVACIONES SED', editable: false, align: 'center', border: { type: 'full' }, protected: true, fontWeight: 'bold' },
-      { range: 'Q19:Q20', label: '', editable: false, align: 'left', border: { type: 'full' }, protected: true },
-      { range: 'R19:R20', label: '', editable: false, align: 'left', border: { type: 'full' }, protected: true },
-      { range: 'S19:S20', label: '', editable: false, align: 'left', border: { type: 'full' }, protected: true },
-      { range: 'T19:T20', label: '', editable: false, align: 'left', border: { type: 'full' }, protected: true },
-      { range: 'U19:U20', label: '', editable: false, align: 'left', border: { type: 'full' }, protected: true }
+      { range: 'Q19:Q20', label: '', editable: false, align: 'left', verticalAlign: 'top', border: { type: 'full' }, protected: true },
+      { range: 'R19:R20', label: '', editable: false, align: 'left', verticalAlign: 'top', border: { type: 'full' }, protected: true },
+      { range: 'S19:S20', label: '', editable: false, align: 'left', verticalAlign: 'top', border: { type: 'full' }, protected: true },
+      { range: 'T19:T20', label: '', editable: false, align: 'left', verticalAlign: 'top', border: { type: 'full' }, protected: true },
+      { range: 'U19:U20', label: '', editable: false, align: 'left', verticalAlign: 'top', border: { type: 'full' }, protected: true }
     ],
     protections: [
       { range: 'A1:U20', description: 'Protección general de la plantilla, solo campos editables pueden ser modificados' }
@@ -112,40 +114,4 @@ function getJornadaSheetTemplate(): JornadaSheetTemplate {
     hideGridlines: true,
     deleteRowsAfter: 20
   };
-}
-
-/**
- * Verifica si una celda específica es editable según la plantilla de la jornada.
- *
- * @param {string} a1Notation La notación A1 de la celda que fue editada (ej. "A1", "C5").
- * @param {JornadaSheetTemplate} template La plantilla de la hoja a verificar.
- * @returns {boolean} `true` si la celda es editable, `false` en caso contrario.
- */
-function isCellEditable(a1Notation: string, template: JornadaSheetTemplate): boolean {
-  // Primero, obtenemos la celda real (sin importar si está en un rango combinado).
-  // Esto es importante porque el usuario puede hacer clic en cualquier parte de un merge.
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  const cell = sheet.getRange(a1Notation);
-  const row = cell.getRow();
-  const col = cell.getColumn();
-  
-  // Recorremos todos los campos definidos en la plantilla.
-  for (const field of template.fields) {
-    const fieldRange = sheet.getRange(field.range);
-    
-    // Verificamos si la celda editada está DENTRO del rango de este campo.
-    if (row >= fieldRange.getRow() &&
-        row <= fieldRange.getLastRow() &&
-        col >= fieldRange.getColumn() &&
-        col <= fieldRange.getLastColumn()) {
-      
-      // Si la celda está dentro del rango, devolvemos el valor de su propiedad 'editable'.
-      // La primera coincidencia que encontremos es la que cuenta.
-      return field.editable;
-    }
-  }
-
-  // Si después de revisar todos los campos no encontramos ninguna coincidencia,
-  // asumimos por seguridad que la celda no es editable.
-  return false;
 }
